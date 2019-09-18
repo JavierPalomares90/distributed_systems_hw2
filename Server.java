@@ -85,12 +85,10 @@ public class Server
       System.out.println("ERROR: Provide 3 arguments");
       System.out.println("\t(1) <tcpPort>: the port number for TCP connection");
       System.out.println("\t(2) <udpPort>: the port number for UDP connection");
-      System.out.println("\t(3) <file>: the file of inventory");
-
+      System.out.println("\t(3) <file>: the list of servers");
       System.exit(-1);
     }
     tcpPort = Integer.parseInt(args[0]);
-    udpPort = Integer.parseInt(args[1]);
     String fileName = args[2];
 
     // parse the inventory file
@@ -98,10 +96,7 @@ public class Server
 
     // Parse messages from clients
     ServerThread tcpServer = new TcpServerThread(tcpPort,inventory);
-    ServerThread udpServer = new DatagramServerThread(udpPort,inventory);
     new Thread(tcpServer).start();
-    new Thread(udpServer).start();
-
   }
 
   private static class Order
@@ -366,55 +361,6 @@ public class Server
 
   }
 
-  private static class DatagramClientWorkerThread extends ClientWorkerThread
-  {
-      private static int BUF_LEN = 1024;
-      private DatagramPacket receivePacket;
-
-      public DatagramClientWorkerThread(DatagramPacket packet,List<Item> inventory)
-      {
-          this.receivePacket = packet;
-          this.inventory = inventory;
-      }
-
-      public void run()
-      {
-
-          int len = BUF_LEN;
-          byte[] buf = new byte[len];
-
-          try 
-          {
-              // Parse command and process
-              if (this.receivePacket.getData() != null)
-              {
-                  String msg = new String(this.receivePacket.getData());
-                  String response = processMessage(msg);
-                  byte[] byteResponse = response.getBytes();
-
-                  // Send response back to client and close outbound socket
-                  if (response != null) {
-                      // Allow OS to assign outbound port
-                      DatagramSocket outboundSocket = new DatagramSocket();
-
-                      DatagramPacket returnPacket = new DatagramPacket(byteResponse,
-                              byteResponse.length,
-                              receivePacket.getAddress(),
-                              receivePacket.getPort());
-                      outboundSocket.send(returnPacket);
-                      outboundSocket.close();
-                  }
-              }
-            } catch (IOException e) 
-            {
-                System.err.println("Unable to parse datagram");
-                e.printStackTrace();
-            }
-
-      }
-
-  }
-
   private static class TcpClientWorkerThread extends ClientWorkerThread
   {
       public TcpClientWorkerThread(Socket s,List<Item> inventory)
@@ -481,55 +427,6 @@ public class Server
       public void stop()
       {
           isRunning.getAndSet(false);
-      }
-
-  }
-
-  private static class DatagramServerThread extends ServerThread
-  {
-      public DatagramServerThread(int port, List<Item> inventory)
-      {
-          super(port, inventory);
-      }
-      
-      public void run()
-      {
-        this.isRunning.getAndSet(true);
-        DatagramPacket receivePacket, returnPacket;
-        int len = 1024;
-
-        try 
-        {
-            while(true) 
-            {
-                int udpPort = this.port;
-                // Assign inbound port and listen
-                DatagramSocket inboundSocket = new DatagramSocket(udpPort);
-                byte[] buf = new byte[len];
-
-                try 
-                {
-                    // Receive command and close inbound socket
-                    receivePacket = new DatagramPacket(buf, buf.length);
-                    inboundSocket.receive(receivePacket);
-                    inboundSocket.close();
-                    // Spawn off a new thread to parse message
-                    ClientWorkerThread client = new DatagramClientWorkerThread(receivePacket,inventory);
-                    Thread t = new Thread(client);
-                    t.start();
-
-                } catch (IOException e) 
-                {
-                    System.err.println("Unable to parse client datagram");
-                    e.printStackTrace();
-                }
-            }
-
-            } catch (Exception e)
-            {
-                System.err.println("Unable to receive message from client");
-                e.printStackTrace();
-            }
       }
 
   }

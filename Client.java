@@ -10,7 +10,6 @@ import java.util.Scanner;
 public class Client {
 
   private static final String TCP_MODE = "T";
-  private static final String UDP_MODE = "U";
   private static final int BUF_LEN = 1024;
   private static final String PURCHASE = "purchase";
   private static final String CANCEL = "cancel";
@@ -18,22 +17,15 @@ public class Client {
   private static final String LIST = "list";
   private static final String SET_MODE ="setmode";
 
-        private static String setMode(String[] tokens)
+  private static String setMode(String[] tokens)
   {
       if (tokens.length < 2)
       {
         System.out.println("Usage: setmode <T|U>");
         return null;
       }
-      String mode = tokens[1];
-      if(UDP_MODE.equals(mode))
-      {
-        return UDP_MODE;
-      }else
-      {
-        // default to TCP Protocol
-        return TCP_MODE;
-      }
+      // default to TCP Protocol
+      return TCP_MODE;
   }
 
 
@@ -97,37 +89,6 @@ public class Client {
 
   }
 
-    private static void sendCmdOverUdp(String command, String hostAddress, int port)
-    {
-        try
-        {
-            //Send message
-            byte[] payload;
-            payload = command.getBytes();
-            InetAddress inetAdd = InetAddress.getByName(hostAddress);
-            // Let the OS pick a port
-            DatagramSocket udpSocket = new DatagramSocket();
-            // Send command to udpPort on server
-            DatagramPacket sPacket = new DatagramPacket(payload, payload.length, inetAdd, port);
-            udpSocket.send(sPacket);
-
-            //Receive Reply:
-            byte[] udpBuff = new byte[BUF_LEN];
-            DatagramPacket rPacket = new DatagramPacket(udpBuff,udpBuff.length);
-            udpSocket.receive(rPacket);
-            String msgData = new String(rPacket.getData());
-            msgData = msgData.trim();
-            // Print the response
-            System.out.println(msgData);
-            udpSocket.close();
-        } catch(Exception e)
-        {
-            System.err.println("Unable to send message over udp");
-            e.printStackTrace();
-        }
-  }
-
-
   private static void sendCmdOverTcp(String command, String hostAddress, int port)
   {
       // Send the purchase over TCP
@@ -181,7 +142,6 @@ public class Client {
   {
     String hostAddress;
     int tcpPort;
-    int udpPort;
     // Default protocol is TCP
     String ipProtocol = TCP_MODE;
 
@@ -190,13 +150,11 @@ public class Client {
       System.out.println("ERROR: Provide 3 arguments");
       System.out.println("\t(1) <hostAddress>: the address of the server");
       System.out.println("\t(2) <tcpPort>: the port number for TCP connection");
-      System.out.println("\t(3) <udpPort>: the port number for UDP connection");
       System.exit(-1);
     }
 
     hostAddress = args[0];
     tcpPort = Integer.parseInt(args[1]);
-    udpPort = Integer.parseInt(args[2]);
 
     Scanner sc = new Scanner(System.in);
     while(sc.hasNextLine()) {
@@ -235,13 +193,7 @@ public class Client {
         // Send the command if it's not null
         if (command != null)
         {
-          if(UDP_MODE.equals(ipProtocol))
-          {
-            sendCmdOverUdp(command,hostAddress,udpPort);
-          }else
-          {
-            sendCmdOverTcp(command,hostAddress,tcpPort);
-          }
+          sendCmdOverTcp(command,hostAddress,tcpPort);
         }
 
       }
