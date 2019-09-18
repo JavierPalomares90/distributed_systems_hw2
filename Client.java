@@ -1,33 +1,17 @@
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.util.Scanner;
 
 public class Client {
 
-  private static final String TCP_MODE = "T";
   private static final int BUF_LEN = 1024;
   private static final String PURCHASE = "purchase";
   private static final String CANCEL = "cancel";
   private static final String SEARCH = "search";
   private static final String LIST = "list";
-  private static final String SET_MODE ="setmode";
-
-  private static String setMode(String[] tokens)
-  {
-      if (tokens.length < 2)
-      {
-        System.out.println("Usage: setmode <T|U>");
-        return null;
-      }
-      // default to TCP Protocol
-      return TCP_MODE;
-  }
-
 
   private static String getPurchaseCmd(String[] tokens) 
   {
@@ -142,12 +126,9 @@ public class Client {
   {
     String hostAddress;
     int tcpPort;
-    // Default protocol is TCP
-    String ipProtocol = TCP_MODE;
 
-
-    if (args.length != 3) {
-      System.out.println("ERROR: Provide 3 arguments");
+    if (args.length != 2) {
+      System.out.println("ERROR: Provide 2 arguments");
       System.out.println("\t(1) <hostAddress>: the address of the server");
       System.out.println("\t(2) <tcpPort>: the port number for TCP connection");
       System.exit(-1);
@@ -161,41 +142,27 @@ public class Client {
       String cmd = sc.nextLine();
       String[] tokens = cmd.split("\\s+");
 
-      if (SET_MODE.equals(tokens[0]))
+      // Send a command to the server
+      String command = null;
+      if(PURCHASE.equals(tokens[0]))
       {
-        // Set the ip protocol mode
-        String mode = setMode(tokens);
-        if(mode != null)
-        {
-            ipProtocol = mode;
-        }
-
-        System.out.println("Setmode to " + ipProtocol);
-      } else
+        command = getPurchaseCmd(tokens);
+      } else if (CANCEL.equals(tokens[0]))
       {
-        // Send a command to the server
-        String command = null;
-        if(PURCHASE.equals(tokens[0]))
-        {
-          command = getPurchaseCmd(tokens);
-        } else if (CANCEL.equals(tokens[0]))
-        {
-          command = getCancelCmd(tokens);
-        } else if (SEARCH.equals(tokens[0]))
-        {
-          command = getSearchCmd(tokens);
-        } else if (LIST.equals(tokens[0]))
-        {
-          command = getListCmd(tokens);
-        } else {
-          System.err.println("Invalid command: " + tokens[0]);
-        }
-        // Send the command if it's not null
-        if (command != null)
-        {
-          sendCmdOverTcp(command,hostAddress,tcpPort);
-        }
-
+        command = getCancelCmd(tokens);
+      } else if (SEARCH.equals(tokens[0]))
+      {
+        command = getSearchCmd(tokens);
+      } else if (LIST.equals(tokens[0]))
+      {
+        command = getListCmd(tokens);
+      } else {
+        System.err.println("Invalid command: " + tokens[0]);
+      }
+      // Send the command if it's not null
+      if (command != null)
+      {
+        sendCmdOverTcp(command,hostAddress,tcpPort);
       }
     }
   }
