@@ -12,350 +12,143 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class Server
 {
-    private static List<Item> inventory;
-    private static List<Order> orders;
-    private static AtomicInteger orderId = new AtomicInteger(1);
-    private static final String PURCHASE = "purchase";
-    private static final String CANCEL = "cancel";
-    private static final String SEARCH = "search";
-    private static final String LIST = "list";
 
-    private synchronized static Order createAndAddOrder(String userName, String productName, int quantity)
-    {
-        int id = orderId.getAndIncrement();
-        Order o = new Order(id,userName,productName,quantity);
-        if(orders == null)
-        {
-            orders = new ArrayList<>();
-        }
-        orders.add(o);
-        return o;
-    }
-
-  private static List<Item> parseInventoryFile(String fileName)
+  private static Peer parsePeer(String line)
   {
-
-
-      if(fileName == null | fileName.isEmpty())
-      {
-        System.err.println("Please provide a valid filename");
+    // parse the list of servers
+    String[] tokens= line.split(":");
+    if(tokens == null || tokens.length != 2)
+    {
+        System.err.println("Invalid line in server file");
         System.exit(-1);
-      }
+    }
+    String ipAddress = tokens[0];
+    String port = tokens[1];
+    Peer p = new Peer(ipAddress,port);
+    return p;
+  }
 
-      // Read the file
-      try
+  private static List<Seat> getSeats(int n)
+  {
+      List<Seat> seats = new ArrayList();
+      for (int i =0; i < n; i++)
       {
-          FileReader invFile = new FileReader(fileName);
-          BufferedReader invBuff = new BufferedReader(invFile);
-          String invLine = null;
-          List<Item> items = new ArrayList<>();
-          while ((invLine = invBuff.readLine()) != null)
-          {
-              if (invLine.length() > 0)
-              {
-                  String[] itemArr = invLine.split("\\s+");
-                  if (itemArr.length == 2)
-                  {
-                      try
-                      {
-                          Item newItem = new Item(itemArr[0], Integer.parseInt(itemArr[1]));
-                          items.add(newItem);
-                      }catch (Exception e)
-                      {
-                          System.err.println("Unable to parse inventory line");
-                          e.printStackTrace();
-                      }
-                  }
-              }
-          }
-          Collections.sort(items,Item.itemComparator);
-          return items;
-      }catch(IOException e)
-      {
-          System.err.println("Unable to read inventory file");
-          e.printStackTrace();
+          Seat s = new Seat(i);
+          seats.add(s);
       }
-      return new ArrayList<>();
+      return seats;
   }
 
   public static void main (String[] args) {
-    int tcpPort;
-    int udpPort;
-    if (args.length != 3) {
-      System.out.println("ERROR: Provide 3 arguments");
-      System.out.println("\t(1) <tcpPort>: the port number for TCP connection");
-      System.out.println("\t(2) <udpPort>: the port number for UDP connection");
-      System.out.println("\t(3) <file>: the list of servers");
-      System.exit(-1);
-    }
-    tcpPort = Integer.parseInt(args[0]);
-    String fileName = args[2];
+    List<Peer> serverList = new ArrayList();
+    List<Seat> seats = new ArrayList();
+    Scanner sc = new Scanner(System.in);
+    int numLines = 0;
+    int serverId = 0;
+    int numServers = 0;
+    int numSeats = 0;
 
-    // parse the inventory file
-    inventory = parseInventoryFile(fileName);
+    while(true)
+    {
+      String cmd = sc.nextLine();
+      if(numLines == 0)
+      {
+        String[] tokens = cmd.split("\\s+");
+        // parse the first line
+        if(tokens == null || tokens.length != 3)
+        {
+            System.err.println("Invalid line in server file");
+            System.exit(-1);
+        }
+        serverId = Integer.parseInt(tokens[0]);
+        numServers = Integer.parseInt(tokens[1]);
+        numSeats = Integer.parseInt(tokens[2]);
+      }
+      else
+      {
+        if (numLines > numServers)
+        {
+            // Done reading the lines
+            break;
+        }
+        Peer p = parsePeer(cmd);
+        serverList.add(p);
+      }
+      numLines++;
+    }
+    seats = getSeats(numSeats);
 
     // Parse messages from clients
-    ServerThread tcpServer = new TcpServerThread(tcpPort,inventory);
-    new Thread(tcpServer).start();
+    //ServerThread tcpServer = new TcpServerThread(tcpPort,inventory);
+    //new Thread(tcpServer).start();
   }
 
-  private static class Order
+  private static class Peer
   {
-      int orderId;
-      String userName;
-      String productName;
-      int productQuantity;
-      // Set to false once orders are cancelled
-      AtomicBoolean validOrder;
+      String ipAddress;
+      String port;
 
-      public Order(int orderId, String userName, String productName, int productQuantity)
+      public Peer(String ipAddress, String port)
       {
-          this.orderId = orderId;
-          this.userName = userName;
-          this.productName = productName;
-          this.productQuantity = productQuantity;
-          validOrder = new AtomicBoolean(true);
-      }
-
-      public String toString()
-      {
-          return this.orderId + " " + this.userName + " " + this.productName + " " + this.productQuantity;
+          this.ipAddress = ipAddress;
+          this.port = port;
       }
 
   }
 
-  private static class Item
+  private static class Seat
   {
-      String name;
-      int quantity;
+      int id;
+      boolean isBooked;
+      String bookedBy;
       Lock lock = new ReentrantLock();
 
 
-      public Item(String name, int quantity)
+      public Seat (int id)
       {
-          if(name == null || quantity < 0)
-          {
-            throw new InvalidParameterException("Item must have valid name and non negative quantity");
-          }
-          this.name = name;
-          this.quantity = quantity;
+          this.id = id;
+          this.isBooked = false;
+          this.bookedBy = null;
       }
 
-      public int getQuantity()
+      public String getBookedBy()
       {
 
           lock.lock();
-          int value = this.quantity;
+          String value = this.bookedBy;
           lock.unlock();
           return value;
       }
 
-      // Update the quantity of an item
       // Do it in synchronized block
-      public void purchaseQuantiy(int toPurchase) throws InvalidParameterException
+      public void book(String name) throws Exception
       {
           lock.lock();
-          int currQuantity = this.quantity;
-          if(toPurchase > currQuantity)
+          boolean isBooked = this.isBooked;
+          if(isBooked)
           {
               lock.unlock();
-              throw new InvalidParameterException("Not enough items to buy of item " + this.name);
+              throw new InvalidParameterException(this.id + " is not available.");
           }
-          // Update the new quantity
-          quantity = quantity - toPurchase;
+          // book the seat
+          this.bookedBy = name;
+          this.isBooked = true;
           // Release the lock after updating the quantity
           lock.unlock();
 
       }
-
-      public static Comparator<Item> itemComparator = new Comparator<Item>()
-      {
-          @Override
-          public int compare(Item item1, Item item2)
-          {
-              if (item1 == null)
-              {
-                  if (item2 == null)
-                  {
-                      return 0;
-                  }
-                  return 1;
-              }
-              if(item2 == null)
-              {
-                  return -1;
-              }
-              return item1.name.compareTo(item2.name);
-          }
-      };
   }
 
   private static abstract class ClientWorkerThread implements  Runnable
   {
       Socket s;
-      List<Item> inventory;
+      List<Seat> seats;
 
-      private String purchaseMsg(String[] tokens)
-      {
-          if(tokens == null || tokens.length < 4)
-          {
-              return null;
-          }
-          String userName = tokens[1];
-          String productName = tokens[2];
-          Integer quantity;
-          try
-          {
-              quantity = Integer.parseInt(tokens[3]);
-          }catch(NumberFormatException e)
-          {
-              System.err.println("Unable to parse quantity for purchase");
-              e.printStackTrace();
-              return null;
-          }
-          // Search for the item in the inventory
-          for (Item i: inventory)
-          {
-              if (productName.equals(i.name))
-              {
-                  // try to purchase the given quantity of i
-                  try
-                  {
-                      i.purchaseQuantiy(quantity);
-                  }catch (Exception e)
-                  {
-                      e.printStackTrace();
-                      return "Not Available - Not enough items.";
-                  }
-                  // Create an order and add it to the list
-                  //
-                  Order o = Server.createAndAddOrder(userName,productName,quantity);
-                  return "Your order has been placed " + o.toString();
-              }
-          }
-
-          // Did not find the item
-          return "Not Available - We do not sell this product.";
-      }
-
-      private String cancelMsg(String[] tokens)
-      {
-          if(tokens == null || tokens.length < 2)
-          {
-              return null;
-          }
-          Integer orderId;
-          try
-          {
-              orderId = Integer.parseInt(tokens[1]);
-          }catch(NumberFormatException e)
-          {
-              System.err.println("Unable to parse orderId for cancellation");
-              e.printStackTrace();
-              return null;
-          }
-          // Search for the order and mark it as invalid
-          for (Order o: orders)
-          {
-              if(o.orderId == orderId.intValue())
-              {
-                  int quantity = o.productQuantity;
-                  String productName = o.productName;
-                  // The index of the product in the inventory list
-                  int index  = Collections.binarySearch(inventory, new Item(productName,quantity), Item.itemComparator);
-                  if(index < 0)
-                  {
-                      // product is not in the inventory
-                      return "Unable to cancel order with id " + orderId;
-                  }
-                  // Increase the quantity of the item in the order and cancel the order
-                  Item invItem = inventory.get(index);
-                  try
-                  {
-                      invItem.purchaseQuantiy(-1 * quantity);
-                      o.validOrder.getAndSet(false);
-                      return "Order " + orderId + " is canceled";
-                  }catch (Exception e)
-                  {
-                      System.err.println("Unable to cancel order with id " + orderId);
-                      e.printStackTrace();
-                      return "Unable to cancel order with id " + orderId;
-                  }
-              }
-          }
-          return orderId + " is not found, no such order";
-      }
-
-     private String searchMsg(String[] tokens)
-      {
-          if(tokens == null || tokens.length < 2)
-          {
-              return null;
-          }
-          String userName = tokens[1];
-          String response = null;
-          // Search for the orders with the given username
-          if(orders == null)
-          {
-              // No orders have been made
-              return "No order found for " + userName;
-          }
-          for (Order o: orders)
-          {
-              // Add orders if the user name matches and it's a valid order
-              if(o.userName.equals(userName) && o.validOrder.get() == true)
-              {
-                  // Add it to the response
-                  if(response == null)
-                  {
-                      response = "";
-                  }
-                  response += o.toString() + "\n";
-              }
-          }
-          // No orders found
-          if(response == null)
-          {
-              return "No order found for " + userName;
-          }
-          return response;
-      }
-
-      private String listMsg(String[] tokens)
-      {
-          if(tokens == null || tokens.length < 1)
-          {
-              return null;
-          }
-          String response = "";
-          for (Item i: inventory)
-          {
-              response += i.name + " " + i.quantity + "\n";;
-          }
-          return response;
-      }
 
       public String processMessage(String msg)
       {
-          String[] tokens = msg.trim().split("\\s+");
-          String response = null;
-          if(PURCHASE.equals(tokens[0]))
-          {
-              response = purchaseMsg(tokens);
-          } else if (CANCEL.equals(tokens[0]))
-          {
-              response = cancelMsg(tokens);
-          } else if (SEARCH.equals(tokens[0]))
-          {
-              response = searchMsg(tokens);
-          }
-           else if (LIST.equals(tokens[0]))
-          {
-              response = listMsg(tokens);
-          } else {
-              System.out.println("Invalid command: " + tokens[0]);
-          }
-          return response;
+          //TODO: Complete impl
+            return null;
       }
 
 
@@ -363,10 +156,10 @@ public class Server
 
   private static class TcpClientWorkerThread extends ClientWorkerThread
   {
-      public TcpClientWorkerThread(Socket s,List<Item> inventory)
+      public TcpClientWorkerThread(Socket s,List<Seat> seats)
       {
           this.s = s;
-          this.inventory = inventory;
+          this.seats = seats;
       }
 
       public void run()
@@ -415,13 +208,13 @@ public class Server
   private static abstract class ServerThread implements Runnable
   {
       int port;
-      List<Item> inventory;
+      List<Seat> seats;
       AtomicBoolean isRunning = new AtomicBoolean(false);
 
-      public ServerThread(int port, List<Item> inventory)
+      public ServerThread(int port, List<Seat> seats)
       {
           this.port = port;
-          this.inventory = inventory;
+          this.seats = seats;
       }
 
       public void stop()
@@ -433,9 +226,9 @@ public class Server
 
   private static class TcpServerThread extends ServerThread
   {
-      public TcpServerThread(int port, List<Item> inventory)
+      public TcpServerThread(int port, List<Seat> seats)
       {
-          super(port,inventory);
+          super(port,seats);
       }
 
       public void run()
@@ -460,7 +253,7 @@ public class Server
                   if(socket != null)
                   {
                       // Spawn off a new thread to process messages from this client
-                      ClientWorkerThread t = new TcpClientWorkerThread(socket,inventory);
+                      ClientWorkerThread t = new TcpClientWorkerThread(socket,seats);
                       new Thread(t).start();
                   }
               }
