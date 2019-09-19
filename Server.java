@@ -16,6 +16,7 @@ public class Server
     private static final String BOOK_SEAT = "bookSeat";
     private static final String SEARCH = "search";
     private static final String DELETE = "delete";
+    private static final String UPDATE = "update";
 
   private static Peer parsePeer(String line)
   {
