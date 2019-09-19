@@ -91,7 +91,7 @@ public class Server
     int tcpPort = Integer.parseInt(self.port);
 
     // Parse messages from clients
-    ServerThread tcpServer = new TcpServerThread(tcpPort,seats);
+    ServerThread tcpServer = new TcpServerThread(tcpPort,seats,serverList);
     new Thread(tcpServer).start();
   }
 
@@ -174,11 +174,13 @@ public class Server
   {
       Socket s;
       List<Seat> seats;
+      List<Peer> peers;
 
-      public ClientWorkerThread(Socket s, List<Seat> seats)
+      public ClientWorkerThread(Socket s, List<Seat> seats, List<Peer> peers)
       {
           this.s = s;
           this.seats = seats;
+          this.peers = peers;
       }
 
       private String reserve(String[] tokens)
@@ -304,9 +306,9 @@ public class Server
 
   private static class TcpClientWorkerThread extends ClientWorkerThread
   {
-      public TcpClientWorkerThread(Socket s,List<Seat> seats)
+      public TcpClientWorkerThread(Socket s,List<Seat> seats, List<Peer> peers)
       {
-          super(s,seats);
+          super(s,seats,peers);
       }
 
       public void run()
@@ -357,11 +359,13 @@ public class Server
       int port;
       List<Seat> seats;
       AtomicBoolean isRunning = new AtomicBoolean(false);
+      List<Peer> peers;
 
-      public ServerThread(int port, List<Seat> seats)
+      public ServerThread(int port, List<Seat> seats,List<Peer> peers)
       {
           this.port = port;
           this.seats = seats;
+          this.peers = peers;
       }
 
       public void stop()
@@ -373,9 +377,9 @@ public class Server
 
   private static class TcpServerThread extends ServerThread
   {
-      public TcpServerThread(int port, List<Seat> seats)
+      public TcpServerThread(int port, List<Seat> seats,List<Peer> peers)
       {
-          super(port,seats);
+          super(port,seats,peers);
       }
 
       public void run()
@@ -400,7 +404,7 @@ public class Server
                   if(socket != null)
                   {
                       // Spawn off a new thread to process messages from this client
-                      ClientWorkerThread t = new TcpClientWorkerThread(socket,seats);
+                      ClientWorkerThread t = new TcpClientWorkerThread(socket,seats,peers);
                       new Thread(t).start();
                   }
               }
