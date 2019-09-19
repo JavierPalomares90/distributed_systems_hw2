@@ -122,6 +122,14 @@ public class Server
           this.isBooked = false;
           this.bookedBy = null;
       }
+      
+      public boolean isBooked()
+      {
+          lock.lock();
+          boolean value = this.isBooked;
+          lock.unlock();
+          return value;
+      }
 
       public String getBookedBy()
       {
@@ -133,21 +141,21 @@ public class Server
       }
 
       // Do it in synchronized block
-      public void book(String name) throws Exception
+      public boolean book(String name)
       {
           lock.lock();
           boolean isBooked = this.isBooked;
           if(isBooked)
           {
               lock.unlock();
-              throw new InvalidParameterException(this.id + " is not available.");
+              return false;
           }
           // book the seat
           this.bookedBy = name;
           this.isBooked = true;
           // Release the lock after updating the quantity
           lock.unlock();
-
+          return true;
       }
   }
 
@@ -164,16 +172,40 @@ public class Server
 
       private String reserve(String[] tokens)
       {
-          String response = null;
-          /**
-           * TODO: Complete impl
-           */
-
-          return response;
+          if(tokens == null || tokens.length < 2 )
+          {
+              return null;
+          }
+          String name = tokens[1];
+          // Check for a reservation against this name
+          String search = search(tokens);
+          if(search != null)
+          {
+              return "Seat already booked against the name provided";
+          }
+          for (Seat s: seats)
+          {
+              if(s.isBooked() == false)
+              {
+                  // Book the seat
+                  int seatId = s.id;
+                  if(s.book(name))
+                  {
+                      return "Seat assigned to you is " + s.id;
+                  }
+              }
+          }
+          return "Sold out - No seat available";
       }
 
       private String bookSeat(String[] tokens)
       {
+          if(tokens == null || tokens.length < 3 )
+          {
+              return null;
+          }
+          String name = tokens[1];
+          int seatNum = Integer.parseInt(tokens[2]);
           String response = null;
           /**
            * TODO: Complete impl
@@ -184,6 +216,11 @@ public class Server
 
       private String search(String[] tokens)
       {
+          if(tokens == null || tokens.length < 2 )
+          {
+              return null;
+          }
+          String name = tokens[1];
           String response = null;
           /**
            * TODO: Complete impl
@@ -194,6 +231,11 @@ public class Server
 
       private String delete(String[] tokens)
       {
+          if(tokens == null || tokens.length < 2 )
+          {
+              return null;
+          }
+          String name = tokens[1];
           String response = null;
           /**
            * TODO: Complete impl
