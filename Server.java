@@ -183,6 +183,7 @@ public class Server
           this.peers = peers;
       }
 
+
       private String reserve(String[] tokens)
       {
           if(tokens == null || tokens.length < 2 )
@@ -273,6 +274,22 @@ public class Server
           return "No reservation found for " + name;
       }
 
+      // Recevied a message from a peer with updated seat list
+      private String update(String[] tokens)
+      {
+          if(tokens == null)
+          {
+              return null;
+          }
+          
+          /**
+           * TODO: Complete impl
+           */
+
+
+          return null;
+      }
+
 
       public String processMessage(String msg)
       {
@@ -282,7 +299,14 @@ public class Server
           {
               return response;
           }
-          if(RESERVE.equals(tokens[0]))
+
+
+          if (UPDATE.equals(tokens[0]))
+          {
+              // Received a update message to update the seat list
+              response = update(tokens);
+          }
+          else if(RESERVE.equals(tokens[0]))
           {
               response = reserve(tokens);
           }
@@ -311,6 +335,15 @@ public class Server
           super(s,seats,peers);
       }
 
+      // Send the updated seat list to peers
+      private void sendUpdatedSeats()
+      {
+          /**
+           * TODO: Complete impl
+           */
+
+      }
+
       public void run()
       {
           // Read the message from the client
@@ -324,6 +357,7 @@ public class Server
               if (inputLine != null && inputLine.length() > 0) {
                   String msg = inputLine;
                   String response = processMessage(msg);
+                  sendUpdatedSeats();
                   if(response != null)
                   {
                       outputWriter.write(response);
