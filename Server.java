@@ -12,6 +12,10 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class Server
 {
+    private static final String RESERVE = "reserve";
+    private static final String BOOK_SEAT = "bookSeat";
+    private static final String SEARCH = "search";
+    private static final String DELETE = "delete";
 
   private static Peer parsePeer(String line)
   {
@@ -152,11 +156,78 @@ public class Server
       Socket s;
       List<Seat> seats;
 
+      public ClientWorkerThread(Socket s, List<Seat> seats)
+      {
+          this.s = s;
+          this.seats = seats;
+      }
+
+      private String reserve(String[] tokens)
+      {
+          String response = null;
+          /**
+           * TODO: Complete impl
+           */
+
+          return response;
+      }
+
+      private String bookSeat(String[] tokens)
+      {
+          String response = null;
+          /**
+           * TODO: Complete impl
+           */
+
+          return response;
+      }
+
+      private String search(String[] tokens)
+      {
+          String response = null;
+          /**
+           * TODO: Complete impl
+           */
+
+          return response;
+      }
+
+      private String delete(String[] tokens)
+      {
+          String response = null;
+          /**
+           * TODO: Complete impl
+           */
+
+          return response;
+      }
+
 
       public String processMessage(String msg)
       {
-          //TODO: Complete impl
-            return null;
+          String[] tokens = msg.trim().split("\\s+");
+          String response = null;
+          if(tokens == null || tokens.length < 1)
+          {
+              return response;
+          }
+          if(RESERVE.equals(tokens[0]))
+          {
+              response = reserve(tokens);
+          }
+          else if (BOOK_SEAT.equals(tokens[0]))
+          {
+              response = bookSeat(tokens);
+          }
+          else if (SEARCH.equals(tokens[0]))
+          {
+              response = search(tokens);
+          }
+          else if (DELETE.equals(tokens[0]))
+          {
+              response = delete(tokens);
+          }
+            return response;
       }
 
 
@@ -166,8 +237,7 @@ public class Server
   {
       public TcpClientWorkerThread(Socket s,List<Seat> seats)
       {
-          this.s = s;
-          this.seats = seats;
+          super(s,seats);
       }
 
       public void run()
