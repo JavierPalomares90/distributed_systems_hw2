@@ -122,6 +122,17 @@ public class Server
           this.isBooked = false;
           this.bookedBy = null;
       }
+
+      public boolean freeSeat()
+      {
+          lock.lock();
+          // free the seat
+          this.isBooked = false;
+          this.bookedBy = null;
+          lock.unlock();
+          return true;
+
+      }
       
       public boolean isBooked()
       {
@@ -188,7 +199,6 @@ public class Server
               if(s.isBooked() == false)
               {
                   // Book the seat
-                  int seatId = s.id;
                   if(s.book(name))
                   {
                       return "Seat assigned to you is " + s.id;
@@ -206,12 +216,21 @@ public class Server
           }
           String name = tokens[1];
           int seatNum = Integer.parseInt(tokens[2]);
-          String response = null;
-          /**
-           * TODO: Complete impl
-           */
+          if(seatNum - 1 > seats.size())
+          {
+              return seatNum + " is not available";
+          }
 
-          return response;
+          Seat s = seats.get(seatNum - 1);
+          if(s.isBooked() == false)
+          {
+              if(s.book(name))
+              {
+                return "Seat assigned to you is " + s.id;
+              }
+          }
+
+          return "Seat " + seatNum + " is not available";
       }
 
       private String search(String[] tokens)
@@ -221,12 +240,14 @@ public class Server
               return null;
           }
           String name = tokens[1];
-          String response = null;
-          /**
-           * TODO: Complete impl
-           */
-
-          return response;
+          for (Seat s: seats)
+          {
+              if(s.getBookedBy().equals(name))
+              {
+                  return "" + s.id;
+              }
+          }
+          return "No reservation found for " + name;
       }
 
       private String delete(String[] tokens)
@@ -236,12 +257,18 @@ public class Server
               return null;
           }
           String name = tokens[1];
-          String response = null;
-          /**
-           * TODO: Complete impl
-           */
+          for (Seat s: seats)
+          {
+              if(s.getBookedBy().equals(name))
+              {
+                  if(s.freeSeat())
+                  {
+                      return "" + s.id;
+                  }
 
-          return response;
+              }
+          }
+          return "No reservation found for " + name;
       }
 
 
