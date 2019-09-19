@@ -47,6 +47,7 @@ public class Server
     int serverId = 0;
     int numServers = 0;
     int numSeats = 0;
+    Peer self = null;
 
     while(true)
     {
@@ -73,14 +74,21 @@ public class Server
         }
         Peer p = parsePeer(cmd);
         serverList.add(p);
+        if(numLines == serverId)
+        {
+            // The current line is describing this
+            self = p;
+        }
       }
       numLines++;
     }
+    // get the tcp port for this
     seats = getSeats(numSeats);
+    int tcpPort = Integer.parseInt(self.port);
 
     // Parse messages from clients
-    //ServerThread tcpServer = new TcpServerThread(tcpPort,inventory);
-    //new Thread(tcpServer).start();
+    ServerThread tcpServer = new TcpServerThread(tcpPort,seats);
+    new Thread(tcpServer).start();
   }
 
   private static class Peer
