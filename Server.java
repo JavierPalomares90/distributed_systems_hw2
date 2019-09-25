@@ -93,7 +93,7 @@ public class Server
     }
     // get the tcp port for this
     seats = getSeats(numSeats);
-    int tcpPort = Integer.parseInt(self.port);
+    int tcpPort = self.port;
 
     // Parse messages from clients
     ServerThread tcpServer = new TcpServerThread(tcpPort,seats,serverList);
@@ -103,19 +103,25 @@ public class Server
   private static class Peer
   {
       String ipAddress;
-      String port;
+      int port = -1;
 
       public Peer(String ipAddress, String port)
       {
           this.ipAddress = ipAddress;
-          this.port = port;
+          try
+          {
+            this.port = Integer.parseInt(port);
+          }catch(NumberFormatException e)
+          {
+              e.printStackTrace();
+          }
       }
 
 
        @Override
        public String toString() 
        { 
-           if(this.ipAddress != null && this.port != null)
+           if(this.ipAddress != null && this.port != -1)
            {
                 return this.ipAddress + ":" + this.port;
            }
@@ -255,7 +261,7 @@ public class Server
 
             }catch(Exception e)
             {
-                System.err.println("Unable to send order");
+                System.err.println("Unable to send msg to " + hostAddress + ":" + port);
                 e.printStackTrace();
             }finally
             {
@@ -277,6 +283,11 @@ public class Server
 
       public void run() 
       {  
+          String cmd = this.msg;
+          String hostAddress =  this.p.ipAddress;
+          int port = this.p.port;
+          // Send the command to the peer
+          sendCmdOverTcp(cmd, hostAddress, port);
       }  
   }
 
@@ -384,27 +395,30 @@ public class Server
           return "No reservation found for " + name;
       }
 
-      // Recevied a message from a peer with updated seat list
       private String update(String[] tokens)
       {
           if(tokens == null)
           {
               return null;
           }
+          /**
+           * TODO: Complete impl
+           */
+          return null;
+      }
+
+      // Send the updated seats list to every peer
+      private String updatePeers(String[] tokens)
+      {
           // Create a pool of 5 threads to send updates to peers
           ExecutorService executor = Executors.newFixedThreadPool(5);
           for (Peer p:peers)
           {
               Runnable worker = new UpdatePeerThread(p, seats);
-
+              executor.execute(worker);
           }
           
-          /**
-           * TODO: Complete impl. Send updated list to each peers using thread pool
-           */
-
-
-          return null;
+          return "Peers received updated seat list";
       }
 
 
