@@ -4,11 +4,15 @@ import java.net.Socket;
 import java.net.DatagramSocket;
 import java.net.DatagramPacket;
 import java.security.InvalidParameterException;
-import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Scanner;
 
 public class Server
 {
@@ -107,6 +111,17 @@ public class Server
           this.port = port;
       }
 
+
+       @Override
+       public String toString() 
+       { 
+           if(this.ipAddress != null && this.port != null)
+           {
+                return this.ipAddress + ":" + this.port;
+           }
+           return "";
+       } 
+
   }
 
   private static class Seat
@@ -132,7 +147,6 @@ public class Server
           this.bookedBy = null;
           lock.unlock();
           return true;
-
       }
       
       public boolean isBooked()
@@ -169,6 +183,101 @@ public class Server
           lock.unlock();
           return true;
       }
+
+      @Override
+       public String toString() 
+       { 
+           String value = "";
+           value = value + id;
+           if(this.isBooked())
+           {
+               String bookedBy = this.getBookedBy();
+               value = value + " " + bookedBy;
+           }
+           return value;
+
+       } 
+  }
+
+  private static class UpdatePeerThread implements Runnable
+  {
+      Peer p;
+      List<Seat> seats;
+      String msg;
+      public UpdatePeerThread(Peer p, List<Seat> seats)
+      {
+          this.p = p;
+          this.seats = seats;
+          msg = marshallSeats();
+      }
+
+      private String marshallSeats()
+      {
+          String val = "";
+          if(seats != null)
+          {
+              for (Seat s: seats)
+              {
+                  // Form the msg encoding of all the seats
+                  val += s.toString() + "\n";
+              }
+          }
+          return val;
+      }
+
+       private static void sendCmdOverTcp(String command, String hostAddress, int port)
+        {
+            // Send the purchase over TCP
+            Socket tcpSocket = null;
+            try
+            {
+                // Get the socket
+                tcpSocket = new Socket(hostAddress, port);
+                PrintWriter outputWriter = new PrintWriter(tcpSocket.getOutputStream(), true);
+                BufferedReader inputReader = new BufferedReader(new InputStreamReader(tcpSocket.getInputStream()));
+                // Write the purchase message
+                outputWriter.write(command + "\n");
+                outputWriter.flush();
+
+                // Wait for the response from the server
+                String response = "";
+                                    
+                while(true)
+                {
+                    response = inputReader.readLine();
+                    if (response == null)
+                    {
+                        break;
+                    }
+                    // Print the response
+                    System.out.println(response);
+                }
+
+            }catch(Exception e)
+            {
+                System.err.println("Unable to send order");
+                e.printStackTrace();
+            }finally
+            {
+                if (tcpSocket != null)
+                {
+                    try
+                    {
+                        tcpSocket.close();
+                    }catch(Exception e)
+                    {
+                        System.err.println("Unable to close socket");
+                        e.printStackTrace();
+                    }
+                }
+
+            }
+        }
+  
+
+      public void run() 
+      {  
+      }  
   }
 
   private static abstract class ClientWorkerThread implements  Runnable
@@ -282,9 +391,16 @@ public class Server
           {
               return null;
           }
+          // Create a pool of 5 threads to send updates to peers
+          ExecutorService executor = Executors.newFixedThreadPool(5);
+          for (Peer p:peers)
+          {
+              Runnable worker = new UpdatePeerThread(p, seats);
+
+          }
           
           /**
-           * TODO: Complete impl
+           * TODO: Complete impl. Send updated list to each peers using thread pool
            */
 
 
