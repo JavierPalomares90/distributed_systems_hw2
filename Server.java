@@ -49,6 +49,9 @@ public class Server
   }
 
   public static void main (String[] args) {
+      /**
+       * TODO: If the server goes down and comes back up, it need to get updates from the other servers
+       */
     List<Peer> serverList = new ArrayList();
     List<Seat> seats = new ArrayList();
     Scanner sc = new Scanner(System.in);
@@ -395,16 +398,53 @@ public class Server
           return "No reservation found for " + name;
       }
 
-      private String update(String[] tokens)
+      private String joinStringArray(String[] arr, int start, int end, String sep)
       {
-          if(tokens == null)
+          String result = "";
+          for (int i = start; i < end - 1; i++)
+          {
+              result = result + arr[i] + sep;
+          }
+          result = result + arr[end - 1];
+          return result;
+      }
+
+      private String update(String msg)
+      {
+          if(msg == null)
           {
               return null;
           }
-          /**
-           * TODO: Complete impl
-           */
-          return null;
+          String[] tokens = msg.trim().split("\\r?\\n");
+          // Parse the updated seat list
+          if(tokens != null)
+          {
+              // the length of tokens must equal the length of the seats list
+              if(seats.size() == tokens.length)
+              {
+                  for(int i = 0; i < seats.size();i++)
+                  {
+                      String line = tokens[i];
+                      String[] fields = line.split("\\s+");
+                      int seatId = Integer.parseInt(fields[0]);
+                      Seat s = seats.get(seatId - 1);
+                      String bookedBy = null;
+                      // Mark the seat as unbooked so it can be updated or remain unbooked
+                      s.freeSeat();
+                      if(fields.length > 1)
+                      {
+                          bookedBy = joinStringArray(fields,0,fields.length," ");
+                          s.book(bookedBy);
+                      }
+
+
+                  }
+
+              }
+            return "Seats successfully updated.";
+          }
+          System.err.println("Error parsing updated seats msg:" + msg);
+          return "Seats not updated.";
       }
 
       // Send the updated seats list to every peer
@@ -431,11 +471,14 @@ public class Server
               return response;
           }
 
+          /**
+           * TODO: need to actually implement the Mutex alg so server can execute the functions below
+           */
 
           if (UPDATE.equals(tokens[0]))
           {
               // Received a update message to update the seat list
-              response = update(tokens);
+              response = update(msg);
           }
           else if(RESERVE.equals(tokens[0]))
           {
@@ -466,15 +509,6 @@ public class Server
           super(s,seats,peers);
       }
 
-      // Send the updated seat list to peers
-      private void sendUpdatedSeats()
-      {
-          /**
-           * TODO: Complete impl
-           */
-
-      }
-
       public void run()
       {
           // Read the message from the client
@@ -488,7 +522,6 @@ public class Server
               if (inputLine != null && inputLine.length() > 0) {
                   String msg = inputLine;
                   String response = processMessage(msg);
-                  sendUpdatedSeats();
                   if(response != null)
                   {
                       outputWriter.write(response);
