@@ -26,6 +26,7 @@ public class Server
     private static final String SEARCH = "search";
     private static final String DELETE = "delete";
     private static final String UPDATE = "update";
+    private static final String REQUEST = "request";
     private static int serverId = -1;
     private static String ipAddress;
     private static int port;
@@ -465,6 +466,11 @@ public class Server
           return result;
       }
 
+      /**
+       * Parse the updated seats
+       * @param msg
+       * @return
+       */
       private String update(String msg)
       {
           if(msg == null)
@@ -504,7 +510,7 @@ public class Server
       }
 
       // Send the updated seats list to every peer
-      private String updatePeers(String[] tokens)
+      private String updatePeers()
       {
           // Create a pool of 5 threads to send updates to peers
           ExecutorService executor = Executors.newFixedThreadPool(5);
@@ -517,6 +523,32 @@ public class Server
           return "Peers received updated seat list";
       }
 
+      private String request(String[] tokens)
+      {
+          /**
+           * TODO: Complete impl
+           */
+           return null;
+      }
+
+      // Send a request to all peers to enter CS. block until peers send response
+      // TODO: Need to test if this is multithreaded safe
+      private void sendRequest()
+      {
+          /**
+           * TODO: Complete impl and test if this is multithreaded safe
+           */
+      }
+
+
+      // Send a release to all peers after exiting CS
+      // TODO: Need to test if this is multithreaded safe
+      private void sendRelease()
+      {
+          /**
+           * TODO: Complete impl and test if this is multithreaded safe
+           */
+      }
 
       public String processMessage(String msg)
       {
@@ -527,30 +559,42 @@ public class Server
               return response;
           }
 
-          /**
-           * TODO: need to actually implement the Mutex alg so server can execute the functions below
-           */
-
           if (UPDATE.equals(tokens[0]))
           {
               // Received a update message to update the seat list
               response = update(msg);
           }
-          else if(RESERVE.equals(tokens[0]))
+          else if (REQUEST.equals(tokens[0]))
           {
-              response = reserve(tokens);
+              // Received a request to enter the CS from a peer
+              request(tokens);
           }
-          else if (BOOK_SEAT.equals(tokens[0]))
+          else
           {
-              response = bookSeat(tokens);
-          }
-          else if (SEARCH.equals(tokens[0]))
-          {
-              response = search(tokens);
-          }
-          else if (DELETE.equals(tokens[0]))
-          {
-              response = delete(tokens);
+              // Send the request to enter the CS. Block until every peer has responded
+              sendRequest();
+
+              if(RESERVE.equals(tokens[0]))
+              {
+                  response = reserve(tokens);
+              }
+              else if (BOOK_SEAT.equals(tokens[0]))
+              {
+                  response = bookSeat(tokens);
+              }
+              else if (SEARCH.equals(tokens[0]))
+              {
+                  response = search(tokens);
+              }
+              else if (DELETE.equals(tokens[0]))
+              {
+                  response = delete(tokens);
+              }
+
+              // Update peers of the new seats
+              updatePeers();
+              // Send a release to the peers
+              sendRelease();
           }
             return response;
       }
