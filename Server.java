@@ -8,10 +8,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+
+import java.util.Queue;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.List;
+import java.util.PriorityQueue;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Scanner;
 
 public class Server
@@ -21,6 +26,12 @@ public class Server
     private static final String SEARCH = "search";
     private static final String DELETE = "delete";
     private static final String UPDATE = "update";
+    private static int serverId = -1;
+    private static String ipAddress;
+    private static int port;
+    private static AtomicInteger logicalClock;
+    // The queue of requests to enter critical section
+    private static PriorityQueue<Request> requests;
 
   private static Peer parsePeer(String line)
   {
@@ -56,10 +67,10 @@ public class Server
     List<Seat> seats = new ArrayList();
     Scanner sc = new Scanner(System.in);
     int numLines = 0;
-    int serverId = 0;
     int numServers = 0;
     int numSeats = 0;
     Peer self = null;
+    logicalClock = new AtomicInteger(0);
 
     while(true)
     {
@@ -96,10 +107,13 @@ public class Server
     }
     // get the tcp port for this
     seats = getSeats(numSeats);
-    int tcpPort = self.port;
+    ipAddress = self.ipAddress;
+
+    // Initialize a queue to maintain the requests from servers
+    requests = new PriorityQueue<>(numServers,new RequestComparator());
 
     // Parse messages from clients
-    ServerThread tcpServer = new TcpServerThread(tcpPort,seats,serverList);
+    ServerThread tcpServer = new TcpServerThread(self.port,seats,serverList);
     new Thread(tcpServer).start();
   }
 
@@ -130,6 +144,48 @@ public class Server
            }
            return "";
        } 
+
+  }
+
+  private static class RequestComparator implements Comparator<Request>
+  {
+      
+      public int compare(Request req1, Request req2)
+      {
+          if(req1 == null)
+          {
+              if(req2 == null)
+              {
+                  return 0;
+              }
+              return -1;
+          }
+          if(req2 == null)
+          {
+              return 1;
+          }
+
+          int comparison = Integer.compare(req1.logicalTimestamp,req2.logicalTimestamp);
+          if(comparison == 0)
+          {
+              comparison = Integer.compare(req1.serverId, req2.serverId);
+          }
+          return comparison;
+      }
+
+  }
+
+  // Class to represent a request to enter the critical section
+  private static class Request
+  {
+      int serverId;
+      int logicalTimestamp;
+
+      public Request(int serverId,int lc)
+      {
+          this.serverId = serverId;
+          this.logicalTimestamp = lc;
+      }
 
   }
 
@@ -511,6 +567,7 @@ public class Server
 
       public void run()
       {
+          logicalClock.getAndIncrement();
           // Read the message from the client
           try
           {
@@ -521,7 +578,11 @@ public class Server
               String inputLine = inputReader.readLine();
               if (inputLine != null && inputLine.length() > 0) {
                   String msg = inputLine;
+                  // Increment the logical clock everytime a client sends a message
+                  logicalClock.getAndIncrement();
                   String response = processMessage(msg);
+                  // Increment the logical clock on response
+                  logicalClock.getAndIncrement();
                   if(response != null)
                   {
                       outputWriter.write(response);
@@ -583,6 +644,8 @@ public class Server
       public void run()
       {
           this.isRunning.getAndSet(true);
+          // increment the logical clock when the thread starts
+          logicalClock.getAndIncrement();
           ServerSocket tcpServerSocket = null;
           try
           {
@@ -594,6 +657,8 @@ public class Server
                   {
                       // Open a new socket with clients
                       socket = tcpServerSocket.accept();
+                      // increment the logical clock everytime a new client connects
+                      logicalClock.getAndIncrement();
                   }catch(Exception e)
                   {
                       System.err.println("Unable to accept new client connection");
