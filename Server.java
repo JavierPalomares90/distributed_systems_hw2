@@ -75,6 +75,11 @@ public class Server
 
     while(true)
     {
+      if (numLines > numServers)
+      {
+        // Done reading the lines
+        break;
+      }
       String cmd = sc.nextLine();
       if(numLines == 0)
       {
@@ -91,11 +96,6 @@ public class Server
       }
       else
       {
-        if (numLines > numServers)
-        {
-            // Done reading the lines
-            break;
-        }
         Peer p = parsePeer(cmd);
         serverList.add(p);
         if(numLines == serverId)
