@@ -426,12 +426,12 @@ public class Server
           String name = tokens[1];
           for (Seat s: seats)
           {
-              if(s.getBookedBy().equals(name))
+              if(s.getBookedBy() != null && s.getBookedBy().equals(name))
               {
                   return "" + s.id;
               }
           }
-          return "No reservation found for " + name;
+          return null;
       }
 
       private String delete(String[] tokens)
@@ -585,6 +585,11 @@ public class Server
               else if (SEARCH.equals(tokens[0]))
               {
                   response = search(tokens);
+                  if(response == null)
+                  {
+                    String name = tokens[1];
+                    response = "No reservation found for " + name;
+                  }
               }
               else if (DELETE.equals(tokens[0]))
               {
