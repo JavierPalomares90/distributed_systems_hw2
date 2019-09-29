@@ -1,4 +1,3 @@
-import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.DatagramSocket;
@@ -8,11 +7,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+
 
 import java.util.Queue;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Callable;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.ArrayList;
@@ -261,39 +266,32 @@ public class Server
                value = value + " " + bookedBy;
            }
            return value;
-
        } 
+
+       public static Seat fromString()
+       {
+           Seat s = null;
+           /**
+            * TODO: Complete impl
+            */
+
+           return s;
+       }
   }
 
-  private static class UpdatePeerThread implements Runnable
+  private static class UpdatePeerThread implements Callable<Integer>
   {
       Peer p;
-      List<Seat> seats;
       String msg;
-      public UpdatePeerThread(Peer p, List<Seat> seats)
+      public UpdatePeerThread(Peer p, String updateMsg)
       {
           this.p = p;
-          this.seats = seats;
-          msg = marshallSeats();
-      }
-
-      private String marshallSeats()
-      {
-          String val = "";
-          if(seats != null)
-          {
-              for (Seat s: seats)
-              {
-                  // Form the msg encoding of all the seats
-                  val += s.toString() + "\n";
-              }
-          }
-          return val;
+          this.msg = updateMsg;
       }
 
        private static void sendCmdOverTcp(String command, String hostAddress, int port)
         {
-            // Send the purchase over TCP
+            // Send the command over TCP
             Socket tcpSocket = null;
             try
             {
@@ -341,13 +339,14 @@ public class Server
         }
   
 
-      public void run() 
+      public Integer call() throws InvalidParameterException
       {  
           String cmd = this.msg;
           String hostAddress =  this.p.ipAddress;
           int port = this.p.port;
           // Send the command to the peer
           sendCmdOverTcp(cmd, hostAddress, port);
+          return 0;
       }  
   }
 
@@ -509,15 +508,39 @@ public class Server
           return "Seats not updated.";
       }
 
+      private String getSeatsAsJson(List<Seat> seats)
+      {
+          String json = "";
+          for(Seat s: seats)
+          {
+              String str = "{" +s.toString() + "}";
+          }
+
+
+          json = "[" + json + "]";
+
+
+          return json;
+      }
+
       // Send the updated seats list to every peer
       private String updatePeers()
       {
+          String seatsJson = getSeatsAsJson(seats);
           // Create a pool of 5 threads to send updates to peers
           ExecutorService executor = Executors.newFixedThreadPool(5);
+          List<Callable<Integer>> workers = new ArrayList<>();
           for (Peer p:peers)
           {
-              Runnable worker = new UpdatePeerThread(p, seats);
-              executor.execute(worker);
+            Callable<Integer> worker = new UpdatePeerThread(p, UPDATE + " " + seatsJson);
+            workers.add(worker);
+          }
+          try
+          {
+            executor.invokeAll(workers);
+          }catch(InterruptedException ex)
+          {
+              ex.printStackTrace();
           }
           
           return "Peers received updated seat list";
@@ -571,35 +594,44 @@ public class Server
           }
           else
           {
-              // Send the request to enter the CS. Block until every peer has responded
-              sendRequest();
 
               if(RESERVE.equals(tokens[0]))
               {
-                  response = reserve(tokens);
+                 // Send the request to enter the CS. Block until every peer has responded
+                 sendRequest();
+                 response = reserve(tokens);
+                 // Update peers of the new seats
+                 updatePeers();
+                 // Send a release to the peers
+                 sendRelease();
               }
               else if (BOOK_SEAT.equals(tokens[0]))
               {
+                  sendRequest();
                   response = bookSeat(tokens);
+                  updatePeers();
+                  sendRelease();
               }
               else if (SEARCH.equals(tokens[0]))
               {
+                  sendRequest();
                   response = search(tokens);
                   if(response == null)
                   {
                     String name = tokens[1];
                     response = "No reservation found for " + name;
                   }
+                  updatePeers();
+                  sendRelease();
               }
               else if (DELETE.equals(tokens[0]))
               {
+                  sendRequest();
                   response = delete(tokens);
+                  updatePeers();
+                  sendRelease();
               }
 
-              // Update peers of the new seats
-              updatePeers();
-              // Send a release to the peers
-              sendRelease();
           }
             return response;
       }
