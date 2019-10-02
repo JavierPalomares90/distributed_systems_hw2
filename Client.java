@@ -1,8 +1,6 @@
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.util.Scanner;
@@ -11,11 +9,10 @@ public class Client {
 
   private static final String TCP_MODE = "T";
   private static final int BUF_LEN = 1024;
-  private static final String PURCHASE = "purchase";
-  private static final String CANCEL = "cancel";
+  private static final String RESERVE = "reserve";
+  private static final String BOOKSEAT = "bookSeat";
   private static final String SEARCH = "search";
-  private static final String LIST = "list";
-  private static final String SET_MODE ="setmode";
+  private static final String DELETE = "delete";
 
   private static String setMode(String[] tokens)
   {
@@ -29,38 +26,39 @@ public class Client {
   }
 
 
-  private static String getPurchaseCmd(String[] tokens) 
-  {
-      if (tokens.length < 4)
-      {
-        System.err.println("Usage: purchase <user-name> <product-name> <quantity>");
-        return null;
-      }
-      String userName = tokens[1];
-      String productName = tokens[2];
-      Integer quantity;
-      try
-      {
-        quantity = Integer.parseInt(tokens[3]);
-      }catch(NumberFormatException e)
-      {
-        System.err.println("Unable to parse quantity for purchase order");
-        e.printStackTrace();
-        return null;
-      }
-      String cmd = "purchase " + userName + " " + productName + " " + quantity;
-      return cmd;
-  }
-
-  private static String getCancelCmd(String[] tokens)
+  private static String getReserveCmd(String[] tokens) 
   {
       if (tokens.length < 2)
       {
-        System.err.println("Usage: cancel <order-id>");
+        System.err.println("Usage: reserve <name>");
         return null;
       }
-      String orderId = tokens[1];
-      String cmd = "cancel " + orderId;
+      String userName = tokens[1];
+
+      String cmd = "reserve " + userName;
+      return cmd;
+  }
+
+  private static String getBookSeatCmd(String[] tokens)
+  {
+      if (tokens.length < 3)
+      {
+        System.err.println("Usage: bookSeat <name> <seatNum>");
+        return null;
+      }
+      String userName = tokens[1];
+      Integer seatNumber;
+      try
+      {
+        seatNumber = Integer.parseInt(tokens[2]);
+      }catch(NumberFormatException e)
+      {
+        System.err.println("Unable to parse seat number");
+        e.printStackTrace();
+        return null;
+      }
+      
+      String cmd = "bookSeat " + userName + seatNumber;
       return cmd;
   }
 
@@ -68,25 +66,26 @@ public class Client {
   {
       if (tokens.length < 2)
       {
-        System.err.println("Usage: cancel <order-id>");
+        System.err.println("Usage: search <name>");
         return null;
       }
       String userName = tokens[1];
+    
       String cmd = "search " + userName;
       return cmd;
-
   }
 
-  private static String getListCmd(String[] tokens)
+    private static String getDeleteCmd(String[] tokens)
   {
-      if (tokens.length < 1)
+      if (tokens.length < 2)
       {
-        System.err.println("Usage: list");
+        System.err.println("Usage: delete <name>");
         return null;
       }
-      String cmd = "list";
+      String userName = tokens[1];
+    
+      String cmd = "delete " + userName;
       return cmd;
-
   }
 
   private static void sendCmdOverTcp(String command, String hostAddress, int port)
@@ -146,8 +145,8 @@ public class Client {
     String ipProtocol = TCP_MODE;
 
 
-    if (args.length != 3) {
-      System.out.println("ERROR: Provide 3 arguments");
+    if (args.length != 2) {
+      System.out.println("ERROR: Provide 2 arguments");
       System.out.println("\t(1) <hostAddress>: the address of the server");
       System.out.println("\t(2) <tcpPort>: the port number for TCP connection");
       System.exit(-1);
@@ -161,42 +160,30 @@ public class Client {
       String cmd = sc.nextLine();
       String[] tokens = cmd.split("\\s+");
 
-      if (SET_MODE.equals(tokens[0]))
+      
+      // Send a command to the server
+      String command = null;
+      if(RESERVE.equals(tokens[0]))
       {
-        // Set the ip protocol mode
-        String mode = setMode(tokens);
-        if(mode != null)
-        {
-            ipProtocol = mode;
-        }
-
-        System.out.println("Setmode to " + ipProtocol);
-      } else
+        command = getReserveCmd(tokens);
+      } else if (BOOKSEAT.equals(tokens[0]))
       {
-        // Send a command to the server
-        String command = null;
-        if(PURCHASE.equals(tokens[0]))
-        {
-          command = getPurchaseCmd(tokens);
-        } else if (CANCEL.equals(tokens[0]))
-        {
-          command = getCancelCmd(tokens);
-        } else if (SEARCH.equals(tokens[0]))
-        {
-          command = getSearchCmd(tokens);
-        } else if (LIST.equals(tokens[0]))
-        {
-          command = getListCmd(tokens);
-        } else {
-          System.err.println("Invalid command: " + tokens[0]);
-        }
-        // Send the command if it's not null
-        if (command != null)
-        {
-          sendCmdOverTcp(command,hostAddress,tcpPort);
-        }
-
+        command = getBookSeatCmd(tokens);
+      } else if (SEARCH.equals(tokens[0]))
+      {
+        command = getSearchCmd(tokens);
+      } else if (DELETE.equals(tokens[0]))
+      {
+        command = getDeleteCmd(tokens);
+      } else {
+        System.err.println("Invalid command: " + tokens[0]);
       }
+      // Send the command if it's not null
+      if (command != null)
+      {
+        sendCmdOverTcp(command,hostAddress,tcpPort);
+      }
+      
     }
   }
 }
