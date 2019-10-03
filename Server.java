@@ -114,6 +114,7 @@ public class Server
     // get the tcp port for this
     seats = getSeats(numSeats);
     ipAddress = self.ipAddress;
+    port = self.port;
 
     // Initialize a queue to maintain the requests from servers
     requests = new PriorityQueue<>(numServers,new RequestComparator());
@@ -471,6 +472,8 @@ public class Server
        */
       private String update(String msg)
       {
+          return "received request to update seats";
+          /*
           if(msg == null)
           {
               return null;
@@ -505,6 +508,7 @@ public class Server
           }
           System.err.println("Error parsing updated seats msg:" + msg);
           return "Seats not updated.";
+          */
       }
 
       private String getSeatsAsJson(List<Seat> seats)
@@ -514,6 +518,8 @@ public class Server
           {
               json += s.toString() + ",";
           }
+          // remove the last comme
+          json = json.substring(0, json.length() - 1);
           json += "]}";
 
           return json;
@@ -526,10 +532,15 @@ public class Server
           // Create a pool of 5 threads to send updates to peers
           ExecutorService executor = Executors.newFixedThreadPool(5);
           List<Callable<Integer>> workers = new ArrayList<>();
+          String self = Server.ipAddress + ":" + Server.port;
           for (Peer p:peers)
           {
-            Callable<Integer> worker = new UpdatePeerThread(p, UPDATE + " " + seatsJson);
-            workers.add(worker);
+              // don't send a message to self
+              if(self.equals(p.toString()) == false)
+              {
+                Callable<Integer> worker = new UpdatePeerThread(p, UPDATE + " " + seatsJson);
+                workers.add(worker);
+              }
           }
           try
           {
