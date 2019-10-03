@@ -256,16 +256,15 @@ public class Server
       }
 
       @Override
+      // To json String
        public String toString() 
        { 
-           String value = "";
-           value = value + id;
-           if(this.isBooked())
-           {
-               String bookedBy = this.getBookedBy();
-               value = value + " " + bookedBy;
-           }
-           return value;
+           String json = "{";
+           json += "\"id\":\""+ this.id + "\",";
+           json += "\"bookedBy\":\"" + (this.getBookedBy() != null? this.getBookedBy():null) + "\",";
+           json += "\"booked\":" + (this.isBooked() ? "true":"false") +"}";
+           return json;
+
        } 
 
        public static Seat fromString()
@@ -510,15 +509,12 @@ public class Server
 
       private String getSeatsAsJson(List<Seat> seats)
       {
-          String json = "";
+          String json = "{\"seats\":[";
           for(Seat s: seats)
           {
-              String str = "{" +s.toString() + "}";
+              json += s.toString() + ",";
           }
-
-
-          json = "[" + json + "]";
-
+          json += "]}";
 
           return json;
       }
