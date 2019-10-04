@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Scanner;
 
+
 public class Server
 {
     private static final String RESERVE = "reserve";
@@ -268,12 +269,35 @@ public class Server
 
        } 
 
-       public static Seat fromString()
+       public static Seat fromString(String idStr, String bookedByStr, String bookedStr)
        {
            Seat s = null;
-           /**
-            * TODO: Complete impl
-            */
+           idStr = idStr.replace("{", "");
+           idStr = idStr.replace("}", "");
+           idStr = idStr.replace("\"", "");
+           idStr = idStr.replace(":", "");
+           idStr = idStr.replace("id", "");
+
+           bookedByStr= bookedByStr.replace("{", "");
+           bookedByStr= bookedByStr.replace("}", "");
+           bookedByStr= bookedByStr.replace("\"", "");
+           bookedByStr= bookedByStr.replace(":", "");
+           bookedByStr= bookedByStr.replace("bookedBy", "");
+
+           bookedStr= bookedStr.replace("{", "");
+           bookedStr= bookedStr.replace("}", "");
+           bookedStr= bookedStr.replace("\"", "");
+           bookedStr= bookedStr.replace(":", "");
+           bookedStr= bookedStr.replace("booked", "");
+
+
+           int idVal = Integer.parseInt(idStr);
+           boolean booked = Boolean.parseBoolean(bookedStr);
+           s = new Seat(idVal);
+           if(booked)
+           {
+            s.book(bookedByStr);
+           }
 
            return s;
        }
@@ -472,6 +496,21 @@ public class Server
        */
       private String update(String msg)
       {
+          msg = msg.replace(UPDATE, "");
+          msg = msg.replace(" {\"seats\":","");
+          msg = msg.replace("[","");
+          msg = msg.replace("]","");
+          String[] tokens = msg.split(",");
+          seats = new ArrayList();
+          for (int i = 0; i < tokens.length;i+=0)
+          {
+              String id = tokens[i];
+              String bookedBy = tokens[++i];
+              String booked = tokens[++i];
+              Seat s = Seat.fromString(id,bookedBy,booked);
+              seats.add(s);
+          }
+
           return "received request to update seats";
           /*
           if(msg == null)
