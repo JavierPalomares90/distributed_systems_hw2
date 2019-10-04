@@ -7,6 +7,8 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.Scanner;
+import java.util.List;
+import java.util.ArrayList;
 
 public class Client {
 
@@ -77,9 +79,9 @@ public class Client {
         return cmd;
     }
 
-    private static void sendCmdOverTcp(String command, InetSocketAddress[] hosts)
+    private static void sendCmdOverTcp(String command, List<InetSocketAddress> hosts)
     {
-        int numHosts = hosts.length;
+        int numHosts = hosts.size();
         int numTries = 0;
         boolean connect = false;
         // Send the purchase over TCP
@@ -91,7 +93,7 @@ public class Client {
             tcpSocket = new Socket();
             while(connect == false) {
                 try {
-                    tcpSocket.connect(hosts[numTries], 100);
+                    tcpSocket.connect(hosts.get(numTries), 100);
                     connect = true;
                 } catch (IOException e) {
                     if (numTries < numHosts) {
@@ -146,42 +148,49 @@ public class Client {
 
     public static void main (String[] args)
     {
-        int numServers = 0;
-        try
-        {
-            numServers = Integer.parseInt(args[0]);
-        }catch(NumberFormatException e)
-        {
-            System.err.println("ERROR: Unable to parse number of servers. First argument should be integer number n of servers.");
-            System.exit(-1);
-        }
-
-        if (args.length != numServers + 1) {
-            System.out.println("ERROR: Provide " + numServers + " server addresses/ports in format <ip-address>:<port-number>");
-            System.exit(-1);
-        }
-
-        // Store all server addresses
-        InetSocketAddress[] hosts = new InetSocketAddress[numServers];
-
-        for(int i = 0; i < numServers; i++) {
-            String[] address = args[i].split(":");
-            InetAddress ip;
-            try {
-                ip = InetAddress.getByName(address[0]);
-            } catch(UnknownHostException e)
-            {
-                System.err.println("ERROR: Invalid IP address.");
-                System.exit(-1);
-            }
-            hosts[i] = new InetSocketAddress(ip, Integer.parseInt(address[1]));
-        }
-
+        List<InetSocketAddress> hosts = new ArrayList<InetSocketAddress>();
+        int numHosts = 0;
+        int numLines = 0;
         Scanner sc = new Scanner(System.in);
+
+        while(true){
+            String in = sc.nextLine();
+
+            if(numLines > numHosts) {
+                break;
+            }
+            if(numLines == 0) {
+                try {
+                    numHosts = Integer.parseInt(in);
+                } catch (NumberFormatException e) {
+                    System.err.println("ERROR: Unable to parse number of servers. First argument should be integer number n of servers.");
+                    System.exit(-1);
+                }
+            } else {
+                for(int i = 0; i < numHosts; i++) {
+                    String[] address = in.split(":");
+                    if(address == null || address.length != 2)
+                    {
+                        System.err.println("ERROR: Invalid host address. Input in format <ip-address>:<port-number>");
+                        System.exit(-1);
+                    }
+                    InetAddress ip;
+                    try {
+                        hosts.add(new InetSocketAddress(InetAddress.getByName(address[0]), Integer.parseInt(address[1])));
+                    } catch(UnknownHostException e)
+                    {
+                        System.err.println("ERROR: Invalid IP address.");
+                        System.exit(-1);
+                    }
+                }
+            }
+
+            numLines++;
+        }
+
         while(sc.hasNextLine()) {
             String cmd = sc.nextLine();
             String[] tokens = cmd.split("\\s+");
-
 
             // Send a command to the server
             String command = null;
