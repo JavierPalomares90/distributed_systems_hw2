@@ -84,7 +84,7 @@ public class Client {
         // Send the purchase over TCP
         Socket tcpSocket = null;
 
-        //TODO: Finish move to next available host logic
+        //TODO: Finish move to next available host
         try
         {
             // Connect to the socket
