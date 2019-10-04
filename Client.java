@@ -1,6 +1,7 @@
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -9,7 +10,6 @@ import java.util.Scanner;
 
 public class Client {
 
-    private static final String TCP_MODE = "T";
     private static final String RESERVE = "reserve";
     private static final String BOOKSEAT = "bookSeat";
     private static final String SEARCH = "search";
@@ -79,17 +79,30 @@ public class Client {
 
     private static void sendCmdOverTcp(String command, InetSocketAddress[] hosts)
     {
-        int maxNumTries = hosts.length;
+        int numHosts = hosts.length;
         int numTries = 0;
+        boolean connect = false;
         // Send the purchase over TCP
         Socket tcpSocket = null;
 
-        //TODO: Finish move to next available host
         try
         {
-            // Connect to the socket
+            // Connect to the host, timeout 100ms
             tcpSocket = new Socket();
-            tcpSocket.connect(hosts[numTries], 100);
+            while(connect == false) {
+                try {
+                    tcpSocket.connect(hosts[numTries], 100);
+                    connect = true;
+                } catch (IOException e) {
+                    if (numTries < numHosts) {
+                        numTries++;
+                    } else {
+                        System.err.println("No available host.");
+                        System.exit(-1);
+                    }
+                }
+            }
+
             PrintWriter outputWriter = new PrintWriter(tcpSocket.getOutputStream(), true);
             BufferedReader inputReader = new BufferedReader(new InputStreamReader(tcpSocket.getInputStream()));
             // Write the purchase message
