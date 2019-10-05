@@ -33,6 +33,7 @@ public class Server
     private static final String DELETE = "delete";
     private static final String UPDATE = "update";
     private static final String REQUEST = "request";
+    private static final String RELEASE = "release";
     private static int serverId = -1;
     private static String ipAddress;
     private static int port;
@@ -303,14 +304,14 @@ public class Server
        }
   }
 
-  private static class UpdatePeerThread implements Callable<Integer>
+  private static class MessagePeerThead implements Callable<Integer>
   {
       Peer p;
       String msg;
-      public UpdatePeerThread(Peer p, String updateMsg)
+      public MessagePeerThead(Peer p, String msgToPeer)
       {
           this.p = p;
-          this.msg = updateMsg;
+          this.msg = msgToPeer;
       }
 
        private static void sendCmdOverTcp(String command, String hostAddress, int port)
@@ -505,49 +506,16 @@ public class Server
           for (int i = 0; i < tokens.length;i+=0)
           {
               String id = tokens[i];
-              String bookedBy = tokens[++i];
-              String booked = tokens[++i];
+              i++;
+              String bookedBy = tokens[i];
+              i++;
+              String booked = tokens[i];
+              i++;
               Seat s = Seat.fromString(id,bookedBy,booked);
               seats.add(s);
           }
 
-          return "received request to update seats";
-          /*
-          if(msg == null)
-          {
-              return null;
-          }
-          String[] tokens = msg.trim().split("\\r?\\n");
-          // Parse the updated seat list
-          if(tokens != null)
-          {
-              // the length of tokens must equal the length of the seats list
-              if(seats.size() == tokens.length)
-              {
-                  for(int i = 0; i < seats.size();i++)
-                  {
-                      String line = tokens[i];
-                      String[] fields = line.split("\\s+");
-                      int seatId = Integer.parseInt(fields[0]);
-                      Seat s = seats.get(seatId - 1);
-                      String bookedBy = null;
-                      // Mark the seat as unbooked so it can be updated or remain unbooked
-                      s.freeSeat();
-                      if(fields.length > 1)
-                      {
-                          bookedBy = joinStringArray(fields,0,fields.length," ");
-                          s.book(bookedBy);
-                      }
-
-
-                  }
-
-              }
-            return "Seats successfully updated.";
-          }
-          System.err.println("Error parsing updated seats msg:" + msg);
-          return "Seats not updated.";
-          */
+          return "Seats updated successfully";
       }
 
       private String getSeatsAsJson(List<Seat> seats)
@@ -568,7 +536,27 @@ public class Server
       private String updatePeers()
       {
           String seatsJson = getSeatsAsJson(seats);
-          // Create a pool of 5 threads to send updates to peers
+          String msg = UPDATE + " " + seatsJson;
+          try
+          {
+            msgPeers(msg);
+          }catch(InterruptedException e)
+          {
+              e.printStackTrace();
+              return "Unable to update peer's seat list";
+          }
+          
+          return "Peers received updated seat list";
+      }
+
+      private String getRequestMsg()
+      {
+          String request = REQUEST + " " + Server.serverId + " " + Server.logicalClock.get();
+           return request;
+      }
+
+      private void msgPeers(String msg) throws InterruptedException
+      {
           ExecutorService executor = Executors.newFixedThreadPool(5);
           List<Callable<Integer>> workers = new ArrayList<>();
           String self = Server.ipAddress + ":" + Server.port;
@@ -577,27 +565,20 @@ public class Server
               // don't send a message to self
               if(self.equals(p.toString()) == false)
               {
-                Callable<Integer> worker = new UpdatePeerThread(p, UPDATE + " " + seatsJson);
+                Callable<Integer> worker = new MessagePeerThead(p, msg);
                 workers.add(worker);
               }
           }
-          try
-          {
-            executor.invokeAll(workers);
-          }catch(InterruptedException ex)
-          {
-              ex.printStackTrace();
-          }
-          
-          return "Peers received updated seat list";
+          executor.invokeAll(workers);
       }
 
+      // Parse a request from peers
       private String request(String[] tokens)
       {
           /**
-           * TODO: Complete impl
+           * TODO: Complete impl and test if this is multithreaded safe
            */
-           return null;
+          return "received request from a peer";
       }
 
       // Send a request to all peers to enter CS. block until peers send response
@@ -605,8 +586,25 @@ public class Server
       private void sendRequest()
       {
           /**
+           * TODO: Test if this is multithreaded safe
+           */
+          String requestMsg = getRequestMsg();
+          try
+          {
+            msgPeers(requestMsg);
+          }catch(InterruptedException e)
+          {
+              e.printStackTrace();
+          }
+          
+      }
+
+      private String release(String[] tokens)
+      {
+          /**
            * TODO: Complete impl and test if this is multithreaded safe
            */
+          return "received release from a peer";
       }
 
 
@@ -615,8 +613,16 @@ public class Server
       private void sendRelease()
       {
           /**
-           * TODO: Complete impl and test if this is multithreaded safe
+           * TODO: Test if this is multithreaded safe
            */
+          String releaseMsg  = RELEASE + " " + Server.serverId;
+          try
+          {
+            msgPeers(releaseMsg);
+          }catch(InterruptedException e)
+          {
+              e.printStackTrace();
+          }
       }
 
       public String processMessage(String msg)
@@ -637,6 +643,10 @@ public class Server
           {
               // Received a request to enter the CS from a peer
               request(tokens);
+          }
+          else if (RELEASE.equals(tokens[0]))
+          {
+              release(tokens);
           }
           else
           {
