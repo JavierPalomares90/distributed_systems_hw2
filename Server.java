@@ -196,6 +196,34 @@ public class Server
           this.logicalTimestamp = lc;
       }
 
+      @Override
+      public boolean equals(Object obj) 
+      {
+          if (obj == this) 
+          {
+              return true;
+          }
+          if (obj == null || obj.getClass() != this.getClass()) 
+          {
+              return false;
+          }
+
+          Request other = (Request) obj;
+          // Request are equal if they are made by the same server
+          // TODO: this may be wrong if one server can make more than 1 request
+          return this.serverId == other.serverId;
+      }
+
+      @Override
+      public int hashCode()
+      {
+          int prime = 31;
+          int result = 1;
+          result = prime * result + serverId;
+          // TODO: this may be wrong if one server can make more than 1 request
+          return result;
+      }
+
   }
 
   private static class Seat
@@ -609,11 +637,9 @@ public class Server
       {
           // Parse the release
           int serverId = Integer.parseInt(tokens[1]);
-          // Remove the server's request from the queue
-          /**
-           * TODO: Complete impl and test if this is multithreaded safe
-           */
-          return "received release from a peer";
+          Request toRemove = new Request(serverId,0);
+          Server.requests.remove(toRemove);
+          return "Removed request from " + serverId;
       }
 
 
