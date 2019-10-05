@@ -530,6 +530,9 @@ public class Server
           msg = msg.replace("[","");
           msg = msg.replace("]","");
           String[] tokens = msg.split(",");
+          /**
+           * TODO: need to this if this updates the Server's seats. if it doesn't, need to make the list static
+           */
           seats = new ArrayList();
           for (int i = 0; i < tokens.length;i+=0)
           {
@@ -660,6 +663,23 @@ public class Server
           }
       }
 
+      private void waitToEnter()
+      {
+          /**
+           * TODO: sync on an object to wait until the request has the serverId at the top of the request.
+           * synchronized(syncObject) {
+    try {
+        // Calling wait() will block this thread until another thread
+        // calls notify() on the object.
+        syncObject.wait();
+    } catch (InterruptedException e) {
+        // Happens if someone interrupts your thread.
+    }
+}
+           */
+
+      }
+
       public String processMessage(String msg)
       {
           String[] tokens = msg.trim().split("\\s+");
@@ -690,6 +710,7 @@ public class Server
               {
                  // Send the request to enter the CS. Block until every peer has responded
                  sendRequest();
+                 waitToEnter();
                  response = reserve(tokens);
                  // Update peers of the new seats
                  updatePeers();
@@ -699,6 +720,7 @@ public class Server
               else if (BOOK_SEAT.equals(tokens[0]))
               {
                   sendRequest();
+                  waitToEnter();
                   response = bookSeat(tokens);
                   updatePeers();
                   sendRelease();
@@ -706,6 +728,7 @@ public class Server
               else if (SEARCH.equals(tokens[0]))
               {
                   sendRequest();
+                  waitToEnter();
                   response = search(tokens);
                   if(response == null)
                   {
@@ -718,6 +741,7 @@ public class Server
               else if (DELETE.equals(tokens[0]))
               {
                   sendRequest();
+                  waitToEnter();
                   response = delete(tokens);
                   updatePeers();
                   sendRelease();
