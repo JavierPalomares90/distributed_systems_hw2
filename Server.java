@@ -575,19 +575,25 @@ public class Server
       // Parse a request from peers
       private String request(String[] tokens)
       {
-          /**
-           * TODO: Complete impl and test if this is multithreaded safe
-           */
-          return "received request from a peer";
+          // Parse the request and add it to the server
+          int serverId = Integer.parseInt(tokens[1]);
+          int lc = Integer.parseInt(tokens[2]);
+          Request r = new Request(serverId,lc);
+          Server.requests.add(r);
+          return "Request from " +  serverId + " parsed successfully";
       }
 
       // Send a request to all peers to enter CS. block until peers send response
-      // TODO: Need to test if this is multithreaded safe
       private void sendRequest()
       {
+          // Add this request to the queue
+          Request r = new Request(Server.serverId,Server.logicalClock.get());
+          Server.requests.add(r);
           /**
            * TODO: Test if this is multithreaded safe
            */
+          // Send the request to all the peersthe queue
+          // TODO: Make sure that this waits for all peers to respond
           String requestMsg = getRequestMsg();
           try
           {
@@ -601,6 +607,9 @@ public class Server
 
       private String release(String[] tokens)
       {
+          // Parse the release
+          int serverId = Integer.parseInt(tokens[1]);
+          // Remove the server's request from the queue
           /**
            * TODO: Complete impl and test if this is multithreaded safe
            */
