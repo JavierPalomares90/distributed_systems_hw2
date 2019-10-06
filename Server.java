@@ -40,6 +40,7 @@ public class Server
     private static AtomicInteger logicalClock;
     // The queue of requests to enter critical section
     private static PriorityQueue<Request> requests;
+    private static AtomicBoolean waitToEnterFlag;
 
   private static Peer parsePeer(String line)
   {
@@ -79,6 +80,7 @@ public class Server
     int numSeats = 0;
     Peer self = null;
     logicalClock = new AtomicInteger(0);
+    waitToEnterFlag = new AtomicBoolean(false);
 
     while(true)
     {
@@ -615,6 +617,9 @@ public class Server
       }
 
       // Send a request to all peers to enter CS. block until peers send response
+      /**
+       * TODO: Test that this actually blocks until all the peers respond
+       */
       private void sendRequest()
       {
           // Add this request to the queue
@@ -665,19 +670,27 @@ public class Server
 
       private void waitToEnter()
       {
-          /**
-           * TODO: sync on an object to wait until the request has the serverId at the top of the request.
-           * synchronized(syncObject) {
-    try {
-        // Calling wait() will block this thread until another thread
-        // calls notify() on the object.
-        syncObject.wait();
-    } catch (InterruptedException e) {
-        // Happens if someone interrupts your thread.
-    }
-}
-           */
-
+          boolean bool = Server.waitToEnterFlag.get();
+          // Mark that we're waiting to enter the thread
+          if(bool == false)
+          {
+              Server.waitToEnterFlag.getAndSet(true);
+          }
+          // Peek the requests and check if our request is at the top of the queue
+          if(Server.requests.peek() != null && Server.serverId == Server.requests.peek().serverId)
+          {
+              return;
+          }
+          // else wait until out request gets to the top of the queue
+          try
+          {
+              // Wait until another thread notifies us to continue
+              waitToEnterFlag.wait();
+          }catch (InterruptedException e)
+          {
+              e.printStackTrace();
+              System.err.println("Error waiting for self request to get to top of queue");
+          }
       }
 
       public String processMessage(String msg)
