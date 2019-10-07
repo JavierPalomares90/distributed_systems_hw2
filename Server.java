@@ -39,7 +39,7 @@ public class Server
     private static int port;
     private static AtomicInteger logicalClock;
     // The queue of requests to enter critical section
-    private static PriorityQueue<Request> requests;
+    private static RequestQueue requestQueue;
     private static AtomicBoolean waitToEnterFlag;
 
   private static Peer parsePeer(String line)
@@ -119,9 +119,8 @@ public class Server
     seats = getSeats(numSeats);
     ipAddress = self.ipAddress;
     port = self.port;
+    requestQueue = new RequestQueue(numServers);
 
-    // Initialize a queue to maintain the requests from servers
-    requests = new PriorityQueue<>(numServers,new RequestComparator());
 
     // Parse messages from clients
     ServerThread tcpServer = new TcpServerThread(self.port,seats,serverList);
@@ -156,6 +155,58 @@ public class Server
            return "";
        } 
 
+  }
+
+  private static class RequestQueue
+  {
+      private Lock lock = new ReentrantLock();
+
+      private PriorityQueue<Request> requests;
+      public RequestQueue(int numServers)
+      {
+        // Initialize a queue to maintain the requests from servers
+        requests = new PriorityQueue<>(numServers,new RequestComparator());
+      }
+
+      public void add(Request r)
+      {
+          /**
+           * TODO: Peek the head of the queue for the server's own request
+           * and notify if it's at the top of the queue
+           */
+          lock.lock();
+          requests.add(r);
+          lock.unlock();
+      }
+
+      public synchronized void remove(Request r)
+      {
+          /**
+           * TODO: Peek the head of the queue for the server's own request
+           * and notify if it's at the top of the queue
+           */
+          lock.lock();
+          requests.remove(r);
+          lock.unlock();
+      }
+
+      public synchronized Request peek()
+      {
+          Request r = null;
+          lock.lock();
+          r = requests.peek();
+          lock.unlock();
+          return r;
+      }
+
+      public synchronized Request poll()
+      {
+          Request r = null;
+          lock.lock();
+          r = requests.poll();
+          lock.unlock();
+          return r;
+      }
   }
 
   private static class RequestComparator implements Comparator<Request>
@@ -612,7 +663,7 @@ public class Server
           int serverId = Integer.parseInt(tokens[1]);
           int lc = Integer.parseInt(tokens[2]);
           Request r = new Request(serverId,lc);
-          Server.requests.add(r);
+          Server.requestQueue.add(r);
           return "Request from " +  serverId + " parsed successfully";
       }
 
@@ -624,7 +675,7 @@ public class Server
       {
           // Add this request to the queue
           Request r = new Request(Server.serverId,Server.logicalClock.get());
-          Server.requests.add(r);
+          Server.requestQueue.add(r);
           /**
            * TODO: Test if this is multithreaded safe
            */
@@ -646,7 +697,7 @@ public class Server
           // Parse the release
           int serverId = Integer.parseInt(tokens[1]);
           Request toRemove = new Request(serverId,0);
-          Server.requests.remove(toRemove);
+          Server.requestQueue.remove(toRemove);
           return "Removed request from " + serverId;
       }
 
@@ -677,7 +728,7 @@ public class Server
               Server.waitToEnterFlag.getAndSet(true);
           }
           // Peek the requests and check if our request is at the top of the queue
-          if(Server.requests.peek() != null && Server.serverId == Server.requests.peek().serverId)
+          if(Server.requestQueue.peek() != null && Server.serverId == Server.requestQueue.peek().serverId)
           {
               return;
           }
