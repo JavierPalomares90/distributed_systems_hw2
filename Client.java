@@ -82,7 +82,7 @@ public class Client {
     private static void sendCmdOverTcp(String command, List<InetSocketAddress> hosts)
     {
         int numHosts = hosts.size();
-        int numTries = 0;
+        int numTries = 1;
         boolean connect = false;
         // Send the purchase over TCP
         Socket tcpSocket = null;
@@ -93,7 +93,7 @@ public class Client {
             tcpSocket = new Socket();
             while(connect == false) {
                 try {
-                    tcpSocket.connect(hosts.get(numTries), 100);
+                    tcpSocket.connect(hosts.get(numTries - 1), 100);
                     connect = true;
                 } catch (IOException e) {
                     if (numTries < numHosts) {
@@ -154,11 +154,12 @@ public class Client {
         Scanner sc = new Scanner(System.in);
 
         while(true){
-            String in = sc.nextLine();
-
             if(numLines > numHosts) {
                 break;
             }
+
+            String in = sc.nextLine();
+
             if(numLines == 0) {
                 try {
                     numHosts = Integer.parseInt(in);
@@ -167,21 +168,20 @@ public class Client {
                     System.exit(-1);
                 }
             } else {
-                for(int i = 0; i < numHosts; i++) {
-                    String[] address = in.split(":");
-                    if(address == null || address.length != 2)
-                    {
-                        System.err.println("ERROR: Invalid host address. Input in format <ip-address>:<port-number>");
-                        System.exit(-1);
-                    }
-                    InetAddress ip;
-                    try {
-                        hosts.add(new InetSocketAddress(InetAddress.getByName(address[0]), Integer.parseInt(address[1])));
-                    } catch(UnknownHostException e)
-                    {
-                        System.err.println("ERROR: Invalid IP address.");
-                        System.exit(-1);
-                    }
+
+                String[] address = in.split(":");
+                if(address == null || address.length != 2)
+                {
+                    System.err.println("ERROR: Invalid host address. Input in format <ip-address>:<port-number>");
+                    System.exit(-1);
+                }
+                InetAddress ip;
+                try {
+                    hosts.add(new InetSocketAddress(InetAddress.getByName(address[0]), Integer.parseInt(address[1])));
+                } catch(UnknownHostException e)
+                {
+                    System.err.println("ERROR: Invalid IP address.");
+                    System.exit(-1);
                 }
             }
 
