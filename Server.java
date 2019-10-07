@@ -168,14 +168,22 @@ public class Server
         requests = new PriorityQueue<>(numServers,new RequestComparator());
       }
 
+      private void checkForSelfRequest()
+      {
+          // Check if our request queue is at the top of the queue
+          if(requests.peek() != null  && requests.peek().serverId == Server.serverId)
+          {
+              requests.poll();
+              // If it is, pop the queue and notify the threads they can enter the CS
+              Server.waitToEnterFlag.notifyAll();
+          }
+      }
+
       public void add(Request r)
       {
-          /**
-           * TODO: Peek the head of the queue for the server's own request
-           * and notify if it's at the top of the queue
-           */
           lock.lock();
           requests.add(r);
+          checkForSelfRequest();
           lock.unlock();
       }
 
@@ -187,6 +195,7 @@ public class Server
            */
           lock.lock();
           requests.remove(r);
+          checkForSelfRequest();
           lock.unlock();
       }
 
