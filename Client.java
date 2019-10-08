@@ -92,12 +92,15 @@ public class Client {
             // Connect to the host, timeout 100ms
             tcpSocket = new Socket();
             while(connect == false) {
+                // TODO: Fix impl of host switching; only first host connects
                 try {
                     tcpSocket.connect(hosts.get(numTries - 1), 100);
                     connect = true;
                 } catch (IOException e) {
                     if (numTries < numHosts) {
                         numTries++;
+                        // Reopen socket
+                        tcpSocket = new Socket();
                     } else {
                         System.err.println("No available host.");
                         System.exit(-1);
