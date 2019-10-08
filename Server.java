@@ -1,7 +1,5 @@
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.DatagramSocket;
-import java.net.DatagramPacket;
 import java.security.InvalidParameterException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -60,7 +58,7 @@ public class Server
   private static List<Seat> getSeats(int n)
   {
       List<Seat> seats = new ArrayList();
-      for (int i =0; i < n; i++)
+      for (int i = 1; i < n + 1; i++)
       {
           Seat s = new Seat(i);
           seats.add(s);
