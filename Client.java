@@ -49,7 +49,7 @@ public class Client {
             return null;
         }
 
-        String cmd = "bookSeat " + userName + seatNumber;
+        String cmd = "bookSeat " + userName + " " + seatNumber;
         return cmd;
     }
 
