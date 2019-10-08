@@ -166,8 +166,9 @@ public class Server
         requests = new PriorityQueue<>(numServers,new RequestComparator());
       }
 
-      private void checkForSelfRequest()
+      public void checkForSelfRequest()
       {
+          lock.lock();
           // Check if our request queue is at the top of the queue
           if(requests.peek() != null  && requests.peek().serverId == Server.serverId)
           {
@@ -175,13 +176,13 @@ public class Server
               // If it is, pop the queue and notify the threads they can enter the CS
               Server.waitToEnterFlag.notifyAll();
           }
+          lock.unlock();
       }
 
       public void add(Request r)
       {
           lock.lock();
           requests.add(r);
-          checkForSelfRequest();
           lock.unlock();
       }
 
@@ -193,11 +194,10 @@ public class Server
            */
           lock.lock();
           requests.remove(r);
-          checkForSelfRequest();
           lock.unlock();
       }
 
-      public synchronized Request peek()
+      public Request peek()
       {
           Request r = null;
           lock.lock();
@@ -206,7 +206,7 @@ public class Server
           return r;
       }
 
-      public synchronized Request poll()
+      public Request poll()
       {
           Request r = null;
           lock.lock();
@@ -567,17 +567,6 @@ public class Server
           return "No reservation found for " + name;
       }
 
-      private String joinStringArray(String[] arr, int start, int end, String sep)
-      {
-          String result = "";
-          for (int i = start; i < end - 1; i++)
-          {
-              result = result + arr[i] + sep;
-          }
-          result = result + arr[end - 1];
-          return result;
-      }
-
       /**
        * Parse the updated seats
        * @param msg
@@ -671,6 +660,7 @@ public class Server
           int lc = Integer.parseInt(tokens[2]);
           Request r = new Request(serverId,lc);
           Server.requestQueue.add(r);
+          Server.requestQueue.checkForSelfRequest();
           return "Request from " +  serverId + " parsed successfully";
       }
 
@@ -705,6 +695,7 @@ public class Server
           int serverId = Integer.parseInt(tokens[1]);
           Request toRemove = new Request(serverId,0);
           Server.requestQueue.remove(toRemove);
+          Server.requestQueue.checkForSelfRequest();
           return "Removed request from " + serverId;
       }
 
