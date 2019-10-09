@@ -465,15 +465,13 @@ public class Server
 
   private static abstract class ClientWorkerThread implements  Runnable
   {
+      ServerThread serverThread;
       Socket s;
-      List<Seat> seats;
-      List<Peer> peers;
 
-      public ClientWorkerThread(Socket s, List<Seat> seats, List<Peer> peers)
+      public ClientWorkerThread(ServerThread thread,Socket s)
       {
           this.s = s;
-          this.seats = seats;
-          this.peers = peers;
+          this.serverThread = thread;
       }
 
 
@@ -490,6 +488,7 @@ public class Server
           {
               return "Seat already booked against the name provided";
           }
+          List<Seat> seats = this.serverThread.getSeats();
           for (Seat s: seats)
           {
               if(s.isBooked() == false)
@@ -512,11 +511,11 @@ public class Server
           }
           String name = tokens[1];
           int seatNum = Integer.parseInt(tokens[2]);
+          List<Seat> seats = this.serverThread.getSeats();
           if(seatNum - 1 > seats.size())
           {
               return seatNum + " is not available";
           }
-
           Seat s = seats.get(seatNum - 1);
           if(s.isBooked() == false)
           {
@@ -536,6 +535,7 @@ public class Server
               return null;
           }
           String name = tokens[1];
+          List<Seat> seats = this.serverThread.getSeats();
           for (Seat s: seats)
           {
               if(s.getBookedBy() != null && s.getBookedBy().equals(name))
@@ -553,6 +553,7 @@ public class Server
               return null;
           }
           String name = tokens[1];
+          List<Seat> seats = this.serverThread.getSeats();
           for (Seat s: seats)
           {
               if(s.getBookedBy().equals(name))
@@ -582,7 +583,7 @@ public class Server
           /**
            * TODO: need to this if this updates the Server's seats. if it doesn't, need to make the list static
            */
-          seats = new ArrayList();
+          List<Seat> updatedSeats = new ArrayList();
           for (int i = 0; i < tokens.length;i+=0)
           {
               String id = tokens[i];
@@ -592,8 +593,9 @@ public class Server
               String booked = tokens[i];
               i++;
               Seat s = Seat.fromString(id,bookedBy,booked);
-              seats.add(s);
+              updatedSeats.add(s);
           }
+          serverThread.setSeats(updatedSeats);
 
           return "Seats updated successfully";
       }
@@ -615,6 +617,7 @@ public class Server
       // Send the updated seats list to every peer
       private String updatePeers()
       {
+          List<Seat> seats = this.serverThread.getSeats();
           String seatsJson = getSeatsAsJson(seats);
           String msg = UPDATE + " " + seatsJson;
           try
@@ -640,6 +643,7 @@ public class Server
           ExecutorService executor = Executors.newFixedThreadPool(5);
           List<Callable<Integer>> workers = new ArrayList<>();
           String self = Server.ipAddress + ":" + Server.port;
+          List<Peer> peers = this.serverThread.getPeers();
           for (Peer p:peers)
           {
               // don't send a message to self
@@ -818,9 +822,9 @@ public class Server
 
   private static class TcpClientWorkerThread extends ClientWorkerThread
   {
-      public TcpClientWorkerThread(Socket s,List<Seat> seats, List<Peer> peers)
+      public TcpClientWorkerThread(ServerThread serverThread, Socket s)
       {
-          super(s,seats,peers);
+          super(serverThread,s);
       }
 
       public void run()
@@ -875,14 +879,38 @@ public class Server
   {
       int port;
       List<Seat> seats;
-      AtomicBoolean isRunning = new AtomicBoolean(false);
+      AtomicBoolean isRunning;
       List<Peer> peers;
+      Lock threadLock;
 
       public ServerThread(int port, List<Seat> seats,List<Peer> peers)
       {
           this.port = port;
           this.seats = seats;
           this.peers = peers;
+          this.isRunning = new AtomicBoolean(false);
+          this.threadLock = new ReentrantLock();
+      }
+
+      public void setSeats(List<Seat> updatedList)
+      {
+          threadLock.lock();
+          this.seats = updatedList;
+          threadLock.unlock();
+      }
+
+      public List<Seat> getSeats()
+      {
+          List<Seat> toReturn;
+          threadLock.lock();
+          toReturn = this.seats;
+          threadLock.unlock();
+          return toReturn;
+      }
+
+      public List<Peer> getPeers()
+      {
+          return this.peers;
       }
 
       public void stop()
@@ -925,7 +953,7 @@ public class Server
                   if(socket != null)
                   {
                       // Spawn off a new thread to process messages from this client
-                      ClientWorkerThread t = new TcpClientWorkerThread(socket,seats,peers);
+                      ClientWorkerThread t = new TcpClientWorkerThread(this,socket);
                       new Thread(t).start();
                   }
               }
