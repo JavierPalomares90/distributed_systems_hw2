@@ -418,11 +418,12 @@ public class Server
                                   
               while(true)
               {
-                  response = inputReader.readLine();
-                  if (response == null)
+                  String input = inputReader.readLine();
+                  if (input == null)
                   {
                       break;
                   }
+                  response += input;
               }
 
           }catch(Exception e)
@@ -573,7 +574,7 @@ public class Server
 
       private void updateSeatList(int version, String msg)
       {
-          msg = msg.replace(" {\"seats\":","");
+          msg = msg.replace("{\"seats\":","");
           msg = msg.replace("[","");
           msg = msg.replace("]","");
           String[] tokens = msg.split(",");
