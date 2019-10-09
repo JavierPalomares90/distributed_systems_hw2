@@ -15,6 +15,7 @@ import java.util.Queue;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.Callable;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -388,7 +389,7 @@ public class Server
        }
   }
 
-  private static class MessagePeerThead implements Callable<Integer>
+  private static class MessagePeerThead implements Callable<String>
   {
       Peer p;
       String msg;
@@ -398,40 +399,12 @@ public class Server
           this.msg = msgToPeer;
       }
 
-      private void processResponseFromPeer(String msg)
-      {
-          String[] tokens = msg.split("\\s+");
-          if(tokens == null || tokens.length < 1)
-          {
-              return;
-          }
-          // received an ack to the request. Check if we need to update seats to newer version
-          if(ACKNOWLEDGE.equals(tokens[0]))
-          {
-              if(tokens.length < 3)
-              {
-                  return;
-              }
-              int version = Integer.parseInt(tokens[1]);
-              // A peer has a newer version, update to it
-              if(version > dataVersion.get())
-              {
-                  // update our seat list
-                  String seatsJson = tokens[2];
-                  /**
-                   * TODO: Parse the json and update the server's version of the seats
-                   */
 
-              }
-
-          }
-
-      }
-
-      private void sendCmdOverTcp(String command, String hostAddress, int port)
+      private String sendCmdOverTcp(String command, String hostAddress, int port)
       {
           // Send the command over TCP
           Socket tcpSocket = null;
+          String response = "";
           try
           {
               // Get the socket
@@ -442,8 +415,6 @@ public class Server
               outputWriter.write(command + "\n");
               outputWriter.flush();
 
-              // Wait for the response from the server
-              String response = "";
                                   
               while(true)
               {
@@ -452,14 +423,13 @@ public class Server
                   {
                       break;
                   }
-                  // Process the response
-                  processResponseFromPeer(response);
               }
 
           }catch(Exception e)
           {
               System.err.println("Unable to send msg to " + hostAddress + ":" + port);
               e.printStackTrace();
+              return null;
           }finally
           {
               if (tcpSocket != null)
@@ -475,17 +445,18 @@ public class Server
               }
 
           }
+          return response;
       }
   
 
-      public Integer call() throws InvalidParameterException
+      public String call() throws InvalidParameterException
       {  
           String cmd = this.msg;
           String hostAddress =  this.p.ipAddress;
           int port = this.p.port;
           // Send the command to the peer
-          sendCmdOverTcp(cmd, hostAddress, port);
-          return 0;
+          String response = sendCmdOverTcp(cmd, hostAddress, port);
+          return response;
       }  
   }
 
@@ -675,10 +646,41 @@ public class Server
            return request;
       }
 
+      private void processResponseFromPeer(String msg)
+      {
+          if(msg == null)
+          {
+              return;
+          }
+          String[] tokens = msg.split("\\s+");
+          if(tokens == null || tokens.length < 1)
+          {
+              return;
+          }
+          // received an ack to the request. Check if we need to update seats to newer version
+          if(ACKNOWLEDGE.equals(tokens[0]))
+          {
+              if(tokens.length < 3)
+              {
+                  return;
+              }
+              int version = Integer.parseInt(tokens[1]);
+              // A peer has a newer version, update to it
+              if(version > dataVersion.get())
+              {
+                  // update our seat list
+                  String seatsJson = tokens[2];
+                  updateSeatList(version, seatsJson);
+              }
+
+          }
+
+      }
+
       private void msgPeers(String msg) throws InterruptedException
       {
           ExecutorService executor = Executors.newFixedThreadPool(5);
-          List<Callable<Integer>> workers = new ArrayList<>();
+          List<Callable<String>> workers = new ArrayList<>();
           String self = Server.ipAddress + ":" + Server.port;
           List<Peer> peers = this.serverThread.getPeers();
           for (Peer p:peers)
@@ -686,11 +688,23 @@ public class Server
               // don't send a message to self
               if(self.equals(p.toString()) == false)
               {
-                Callable<Integer> worker = new MessagePeerThead(p, msg);
+                Callable<String> worker = new MessagePeerThead(p, msg);
                 workers.add(worker);
               }
           }
-          executor.invokeAll(workers);
+          List<Future<String>> responses = executor.invokeAll(workers);
+          for(Future<String> futureResponse: responses)
+          {
+              try
+              {
+                String response = futureResponse.get();
+                processResponseFromPeer(response);
+              }catch (Exception e)
+              {
+                  e.printStackTrace();
+                  System.err.println("Unable to process response from peer");
+              }
+          }
       }
 
       // Parse a request from peers
