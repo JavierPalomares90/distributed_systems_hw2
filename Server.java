@@ -32,6 +32,7 @@ public class Server
     private static final String UPDATE = "update";
     private static final String REQUEST = "request";
     private static final String RELEASE = "release";
+    private static final String ACKNOWLEDGE= "acknowledge";
     private static int serverId = -1;
     private static String ipAddress;
     private static int port;
@@ -39,6 +40,7 @@ public class Server
     // The queue of requests to enter critical section
     private static RequestQueue requestQueue;
     private static AtomicBoolean waitToEnterFlag;
+    private static AtomicInteger dataVersion;
 
   private static Peer parsePeer(String line)
   {
@@ -78,6 +80,7 @@ public class Server
     int numSeats = 0;
     Peer self = null;
     logicalClock = new AtomicInteger(0);
+    dataVersion = new AtomicInteger(0);
     waitToEnterFlag = new AtomicBoolean(false);
 
     while(true)
@@ -188,10 +191,6 @@ public class Server
 
       public synchronized void remove(Request r)
       {
-          /**
-           * TODO: Peek the head of the queue for the server's own request
-           * and notify if it's at the top of the queue
-           */
           lock.lock();
           requests.remove(r);
           lock.unlock();
@@ -270,7 +269,6 @@ public class Server
 
           Request other = (Request) obj;
           // Request are equal if they are made by the same server
-          // TODO: this may be wrong if one server can make more than 1 request
           return this.serverId == other.serverId;
       }
 
@@ -280,7 +278,6 @@ public class Server
           int prime = 31;
           int result = 1;
           result = prime * result + serverId;
-          // TODO: this may be wrong if one server can make more than 1 request
           return result;
       }
 
@@ -328,7 +325,6 @@ public class Server
           return value;
       }
 
-      // Do it in synchronized block
       public boolean book(String name)
       {
           lock.lock();
@@ -402,54 +398,84 @@ public class Server
           this.msg = msgToPeer;
       }
 
-       private static void sendCmdOverTcp(String command, String hostAddress, int port)
-        {
-            // Send the command over TCP
-            Socket tcpSocket = null;
-            try
-            {
-                // Get the socket
-                tcpSocket = new Socket(hostAddress, port);
-                PrintWriter outputWriter = new PrintWriter(tcpSocket.getOutputStream(), true);
-                BufferedReader inputReader = new BufferedReader(new InputStreamReader(tcpSocket.getInputStream()));
-                // Write the purchase message
-                outputWriter.write(command + "\n");
-                outputWriter.flush();
+      private void processResponseFromPeer(String msg)
+      {
+          String[] tokens = msg.split("\\s+");
+          if(tokens == null || tokens.length < 1)
+          {
+              return;
+          }
+          // received an ack to the request. Check if we need to update seats to newer version
+          if(ACKNOWLEDGE.equals(tokens[0]))
+          {
+              if(tokens.length < 3)
+              {
+                  return;
+              }
+              int version = Integer.parseInt(tokens[1]);
+              // A peer has a newer version, update to it
+              if(version > dataVersion.get())
+              {
+                  // update our seat list
+                  String seatsJson = tokens[2];
+                  /**
+                   * TODO: Parse the json and update the server's version of the seats
+                   */
 
-                // Wait for the response from the server
-                String response = "";
-                                    
-                while(true)
-                {
-                    response = inputReader.readLine();
-                    if (response == null)
-                    {
-                        break;
-                    }
-                    // Print the response
-                    System.out.println(response);
-                }
+              }
 
-            }catch(Exception e)
-            {
-                System.err.println("Unable to send msg to " + hostAddress + ":" + port);
-                e.printStackTrace();
-            }finally
-            {
-                if (tcpSocket != null)
-                {
-                    try
-                    {
-                        tcpSocket.close();
-                    }catch(Exception e)
-                    {
-                        System.err.println("Unable to close socket");
-                        e.printStackTrace();
-                    }
-                }
+          }
 
-            }
-        }
+      }
+
+      private void sendCmdOverTcp(String command, String hostAddress, int port)
+      {
+          // Send the command over TCP
+          Socket tcpSocket = null;
+          try
+          {
+              // Get the socket
+              tcpSocket = new Socket(hostAddress, port);
+              PrintWriter outputWriter = new PrintWriter(tcpSocket.getOutputStream(), true);
+              BufferedReader inputReader = new BufferedReader(new InputStreamReader(tcpSocket.getInputStream()));
+              // Write the purchase message
+              outputWriter.write(command + "\n");
+              outputWriter.flush();
+
+              // Wait for the response from the server
+              String response = "";
+                                  
+              while(true)
+              {
+                  response = inputReader.readLine();
+                  if (response == null)
+                  {
+                      break;
+                  }
+                  // Process the response
+                  processResponseFromPeer(response);
+              }
+
+          }catch(Exception e)
+          {
+              System.err.println("Unable to send msg to " + hostAddress + ":" + port);
+              e.printStackTrace();
+          }finally
+          {
+              if (tcpSocket != null)
+              {
+                  try
+                  {
+                      tcpSocket.close();
+                  }catch(Exception e)
+                  {
+                      System.err.println("Unable to close socket");
+                      e.printStackTrace();
+                  }
+              }
+
+          }
+      }
   
 
       public Integer call() throws InvalidParameterException
@@ -496,6 +522,8 @@ public class Server
                   // Book the seat
                   if(s.book(name))
                   {
+                      // Upddate the version of the data since we made a modification
+                      dataVersion.getAndIncrement();
                       return "Seat assigned to you is " + s.id;
                   }
               }
@@ -521,6 +549,8 @@ public class Server
           {
               if(s.book(name))
               {
+                // Upddate the version of the data since we made a modification
+                dataVersion.getAndIncrement();
                 return "Seat assigned to you is " + s.id;
               }
           }
@@ -560,6 +590,8 @@ public class Server
               {
                   if(s.freeSeat())
                   {
+                       // Upddate the version of the data since we made a modification
+                       dataVersion.getAndIncrement();
                       return "" + s.id;
                   }
 
@@ -568,21 +600,12 @@ public class Server
           return "No reservation found for " + name;
       }
 
-      /**
-       * Parse the updated seats
-       * @param msg
-       * @return
-       */
-      private String update(String msg)
+      private void updateSeatList(int version, String msg)
       {
-          msg = msg.replace(UPDATE, "");
           msg = msg.replace(" {\"seats\":","");
           msg = msg.replace("[","");
           msg = msg.replace("]","");
           String[] tokens = msg.split(",");
-          /**
-           * TODO: need to this if this updates the Server's seats. if it doesn't, need to make the list static
-           */
           List<Seat> updatedSeats = new ArrayList();
           for (int i = 0; i < tokens.length;i+=0)
           {
@@ -595,8 +618,20 @@ public class Server
               Seat s = Seat.fromString(id,bookedBy,booked);
               updatedSeats.add(s);
           }
-          serverThread.setSeats(updatedSeats);
+          serverThread.setSeats(version,updatedSeats);
+      }
 
+      /**
+       * Parse the updated seats
+       * @param msg
+       * @return
+       */
+      private String update(String msg)
+      {
+          String[] strs = msg.split("\\s+");
+          int version = Integer.parseInt(strs[1]);
+          String seatsJson = strs[2];
+          updateSeatList(version,seatsJson);
           return "Seats updated successfully";
       }
 
@@ -618,8 +653,10 @@ public class Server
       private String updatePeers()
       {
           List<Seat> seats = this.serverThread.getSeats();
+          int version = dataVersion.get();
           String seatsJson = getSeatsAsJson(seats);
-          String msg = UPDATE + " " + seatsJson;
+          // Send the version of the data in the update
+          String msg = UPDATE + " " + version + " " + seatsJson;
           try
           {
             msgPeers(msg);
@@ -665,7 +702,12 @@ public class Server
           Request r = new Request(serverId,lc);
           Server.requestQueue.add(r);
           Server.requestQueue.checkForSelfRequest();
-          return "Request from " +  serverId + " parsed successfully";
+          List<Seat> seats = this.serverThread.getSeats();
+          int version = dataVersion.get();
+          String seatsJson = getSeatsAsJson(seats);
+          // Acknowledge the request and send our own version of the seats
+          String msg = ACKNOWLEDGE + " " + version + " " + seatsJson;
+          return msg;
       }
 
       // Send a request to all peers to enter CS. block until peers send response
@@ -892,10 +934,11 @@ public class Server
           this.threadLock = new ReentrantLock();
       }
 
-      public void setSeats(List<Seat> updatedList)
+      public void setSeats(int version, List<Seat> updatedList)
       {
           threadLock.lock();
           this.seats = updatedList;
+          Server.dataVersion.set(version);
           threadLock.unlock();
       }
 
