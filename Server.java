@@ -759,11 +759,11 @@ public class Server
           else if (REQUEST.equals(tokens[0]))
           {
               // Received a request to enter the CS from a peer
-              request(tokens);
+              response = request(tokens);
           }
           else if (RELEASE.equals(tokens[0]))
           {
-              release(tokens);
+              response = release(tokens);
           }
           else
           {
