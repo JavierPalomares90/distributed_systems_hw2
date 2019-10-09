@@ -858,7 +858,6 @@ public class Server
                     String name = tokens[1];
                     response = "No reservation found for " + name;
                   }
-                  updatePeers();
                   sendRelease();
               }
               else if (DELETE.equals(tokens[0]))
