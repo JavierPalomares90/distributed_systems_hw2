@@ -432,8 +432,6 @@ public class Server
 
           }catch(Exception e)
           {
-              System.err.println("Unable to send msg to " + hostAddress + ":" + port);
-              e.printStackTrace();
               return null;
           }finally
           {
