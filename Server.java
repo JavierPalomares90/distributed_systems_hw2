@@ -178,7 +178,10 @@ public class Server
           {
               requests.poll();
               // If it is, pop the queue and notify the threads they can enter the CS
-              Server.waitToEnterFlag.notifyAll();
+              synchronized(Server.waitToEnterFlag)
+              {
+                Server.waitToEnterFlag.notifyAll();
+              }
           }
           lock.unlock();
       }
