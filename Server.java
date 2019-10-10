@@ -515,13 +515,20 @@ public class Server
           String name = tokens[1];
           int seatNum = Integer.parseInt(tokens[2]);
           List<Seat> seats = this.serverThread.getSeats();
-          if(seatNum - 1 > seats.size())
+          
+          if(seatNum > seats.size() || seatNum < 1)
           {
-              return seatNum + " is not available";
+              return seatNum + " does not exist";
           }
+          
           Seat s = seats.get(seatNum - 1);
           if(s.isBooked() == false)
           {
+              String[] verify = {"search", name};
+              if(search(verify) != null)
+              {
+                return "Seat " + s.id + " already booked against the name provided";
+              }
               if(s.book(name))
               {
                 // Upddate the version of the data since we made a modification
