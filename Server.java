@@ -1071,22 +1071,20 @@ public class Server
               Callable<String> worker = new MessagePeerThead(p, msg);
               workers.add(worker);
             }
-            List<Future<String>> responses = executor.invokeAll(workers);
-            for(Future<String> futureResponse: responses)
-            {
-                try
-                {
-                    String response = futureResponse.get();
-                    processResponseFromPeer(response);
-                }catch (Exception e)
-                {
-                    e.printStackTrace();
-                    System.err.println("Unable to process response from peer");
-                }
-            }
-
           }
-
+          List<Future<String>> responses = executor.invokeAll(workers);
+          for(Future<String> futureResponse: responses)
+          {
+              try
+              {
+                  String response = futureResponse.get();
+                  processResponseFromPeer(response);
+              }catch (Exception e)
+              {
+                  e.printStackTrace();
+                  System.err.println("Unable to process response from peer");
+              }
+          }
       }
 
 
