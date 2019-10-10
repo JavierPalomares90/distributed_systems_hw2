@@ -34,6 +34,7 @@ public class Server
     private static final String REQUEST = "request";
     private static final String RELEASE = "release";
     private static final String ACKNOWLEDGE= "acknowledge";
+    private static final String HANDSHAKE = "handshake";
     private static int serverId = -1;
     private static String ipAddress;
     private static int port;
@@ -641,7 +642,7 @@ public class Server
           String msg = UPDATE + " " + version + " " + seatsJson;
           try
           {
-            msgPeers(msg);
+              this.serverThread.messagePeers(msg);
           }catch(InterruptedException e)
           {
               e.printStackTrace();
@@ -752,7 +753,7 @@ public class Server
           String requestMsg = getRequestMsg();
           try
           {
-            msgPeers(requestMsg);
+              this.serverThread.messagePeers(requestMsg);
           }catch(InterruptedException e)
           {
               e.printStackTrace();
@@ -770,6 +771,19 @@ public class Server
           return "Removed request from " + serverId;
       }
 
+      private String handshake(String[] tokens)
+      {
+          // Parse the release
+          int serverId = Integer.parseInt(tokens[1]);
+          int version = dataVersion.get();
+          List<Seat> seats = this.serverThread.getSeats();
+          String seatsJson = getSeatsAsJson(seats);
+          // Respond to the handshake send our own version of the seats
+          String msg = HANDSHAKE + " " + version + " " + seatsJson;
+          return msg;
+
+      }
+
 
       // Send a release to all peers after exiting CS
       // TODO: Need to test if this is multithreaded safe
@@ -781,7 +795,7 @@ public class Server
           String releaseMsg  = RELEASE + " " + Server.serverId;
           try
           {
-            msgPeers(releaseMsg);
+              this.serverThread.messagePeers(releaseMsg);
           }catch(InterruptedException e)
           {
               e.printStackTrace();
@@ -835,6 +849,11 @@ public class Server
           else if (RELEASE.equals(tokens[0]))
           {
               response = release(tokens);
+          }
+          else if (HANDSHAKE.equals(tokens[0]))
+          {
+              // Received a handshake from a peer
+              response = handshake(tokens);
           }
           else
           {
@@ -985,6 +1004,94 @@ public class Server
           isRunning.getAndSet(false);
       }
 
+      private void updateSeatList(int version, String msg)
+      {
+          msg = msg.replace("{\"seats\":","");
+          msg = msg.replace("[","");
+          msg = msg.replace("]","");
+          String[] tokens = msg.split(",");
+          List<Seat> updatedSeats = new ArrayList();
+          for (int i = 0; i < tokens.length;i+=0)
+          {
+              String id = tokens[i];
+              i++;
+              String bookedBy = tokens[i];
+              i++;
+              String booked = tokens[i];
+              i++;
+              Seat s = Seat.fromString(id,bookedBy,booked);
+              updatedSeats.add(s);
+          }
+          this.setSeats(version,updatedSeats);
+      }
+
+
+      private void processResponseFromPeer(String msg)
+      {
+          if(msg == null)
+          {
+              return;
+          }
+          String[] tokens = msg.split("\\s+");
+          if(tokens == null || tokens.length < 1)
+          {
+              return;
+          }
+          // received an ack to the request. Check if we need to update seats to newer version
+          if(ACKNOWLEDGE.equals(tokens[0]) || HANDSHAKE.equals(tokens[0]))
+          {
+              if(tokens.length < 3)
+              {
+                  return;
+              }
+              int version = Integer.parseInt(tokens[1]);
+              // A peer has a newer version, update to it
+              if(version > dataVersion.get())
+              {
+                  // update our seat list
+                  String seatsJson = tokens[2];
+                  updateSeatList(version, seatsJson);
+              }
+
+          }
+
+      }
+      /**
+       * Message each of the peers, get their updated seat list
+       */
+      public void messagePeers(String msg) throws InterruptedException
+      {
+          ExecutorService executor = Executors.newFixedThreadPool(5);
+          List<Callable<String>> workers = new ArrayList<>();
+          String self = Server.ipAddress + ":" + Server.port;
+          List<Peer> peers = this.getPeers();
+          for (Peer p:peers)
+          {
+              // don't send a message to self
+            if(self.equals(p.toString()) == false)
+            {
+              Callable<String> worker = new MessagePeerThead(p, msg);
+              workers.add(worker);
+            }
+            List<Future<String>> responses = executor.invokeAll(workers);
+            for(Future<String> futureResponse: responses)
+            {
+                try
+                {
+                    String response = futureResponse.get();
+                    processResponseFromPeer(response);
+                }catch (Exception e)
+                {
+                    e.printStackTrace();
+                    System.err.println("Unable to process response from peer");
+                }
+            }
+
+          }
+
+      }
+
+
   }
 
   private static class TcpServerThread extends ServerThread
@@ -1003,6 +1110,10 @@ public class Server
           try
           {
               tcpServerSocket = new ServerSocket(this.port);
+              // handshake with the peers as soon as we come up
+              String handshakeMsg = HANDSHAKE + " " + Server.serverId;
+              messagePeers(handshakeMsg);
+
               while(this.isRunning.get() == true)
               {
                   Socket socket = null;
