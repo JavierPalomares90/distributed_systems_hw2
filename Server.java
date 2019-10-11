@@ -567,7 +567,7 @@ public class Server
           List<Seat> seats = this.serverThread.getSeats();
           for (Seat s: seats)
           {
-              if(s.getBookedBy().equals(name))
+              if(s.getBookedBy() != null && s.getBookedBy().equals(name))
               {
                   if(s.freeSeat())
                   {
