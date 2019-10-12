@@ -7,9 +7,9 @@
     ```javac Client.java```
 ### To Run
 1. Start up each server
-   The first line of the input to a server contains three natural numbers separated by a single white-space: `server-id`: server's unique id, `n`: total numbers of server instances, and `z`: the total number of seats in the theater. The numbers of the seats are dened from 1 to z. The next n lines of the server input dene the addresses of all the n servers in the `<ip-address>:<port-number>` format, one per line. The `<ip-address>:<port-number>` of the i-th address line denotes the ip address and port number of server with id i. The crash of a server is simulated by `Ctrl-C`.
+   The first line of the input to a server contains three natural numbers separated by a single white-space: `server-id`: server's unique id, `n`: total numbers of server instances, and `z`: the total number of seats in the theater. The numbers of the seats are defined from 1 to z. The next n lines of the server input dene the addresses of all the n servers in the `<ip-address>:<port-number>` format, one per line. The `<ip-address>:<port-number>` of the i-th address line denotes the ip address and port number of server with id i. The crash of a server is simulated by `Ctrl-C`.
 2. Start up each client
-   A client also accepts its commands by reading standard input. The first line of client input contains the `n`: a natural number that indicates the number of servers present. The next n lines of client input list the ip-addresses, and port of these n servers, one per line in `<ip-address>:<port-number>` form. Their order of appearance in client input denes the server proximity to this client, and the client must connect to servers in this order.
+   A client also accepts its commands by reading standard input. The first line of client input contains the `n`: a natural number that indicates the number of servers present. The next n lines of client input list the ip-addresses, and port of these n servers, one per line in `<ip-address>:<port-number>` form. Their order of appearance in client input defines the server proximity to this client, and the client must connect to servers in this order.
 
 The remainder of the client input contains seat reservation and return commands that should be executed by the client in order of their appearance. The format of these commands is one of the following:
 
