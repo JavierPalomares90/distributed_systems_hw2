@@ -47,8 +47,7 @@ reserve Bob
 delete Mary
 search John
 ```
-#### :w
-client2 input:
+#### client2 input:
 ```
 2
 127.0.0.1:8030
